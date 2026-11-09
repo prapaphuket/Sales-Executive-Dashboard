@@ -160,7 +160,7 @@ const D = /*__DATA__*/null;
   // ---------- 3. แนวโน้ม + ฤดูกาล ----------
   const ser = [
     { name: 'T1', c: '#9FD0C9', d: D.trend[0].data }, { name: 'T2', c: '#3E9C96', d: D.trend[1].data }, { name: 'T3', c: '#0E6B6B', d: D.trend[2].data },
-    { name: 'ลูกค้าสัญญา (ทอท. กปภ. หอถัง)', c: '#C9A36A', d: D.trend[3].data.map((x, i) => x + D.trend[4].data[i] + D.trend[5].data[i]) },
+    { name: 'ลูกค้าสัญญา (ทอท. กปภ. อบต.)', c: '#C9A36A', d: D.trend[3].data.map((x, i) => x + D.trend[4].data[i] + D.trend[5].data[i]) },
   ];
   const W = 780, H = 380, pl = 46, pb = 30, pt = 14, n = D.trendMs.length;
   const tot = D.trendMs.map((m, i) => ser.reduce((s, x) => s + x.d[i], 0));
