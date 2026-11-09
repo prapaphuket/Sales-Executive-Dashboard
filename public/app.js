@@ -7,20 +7,28 @@
     oliveChart: '#6B8E4E', neutral: '#8A8F98', body: '#1C1C1E', text2: '#4A5160', line: '#DCE2EA',
     good: '#1E7D45', warn: '#8A5300', bad: '#B42318',
   };
-  const BR_COLOR = { 'ไม้ขาว': C.navy, 'สาคู': C.oliveChart };
-  const brColor = (b) => BR_COLOR[b] || C.neutral;
+  const BR_COLOR = { 'ไม้ขาว': 1, 'สาคู': 2 };
+  const brColor = (b) => (BR_COLOR[b] === 1 ? C.navy : BR_COLOR[b] === 2 ? C.oliveChart : C.neutral);
   // สาขาที่ปิดแล้ว/ไม่ระบุ รวมเป็นกลุ่มเดียวในกราฟ (ตารางยังแยกตามจริง)
   const OTHER = 'อื่น ๆ (สาขาปิด/ไม่ระบุ)';
   const brG = (b) => (BR_COLOR[b] ? b : OTHER);
   const chartBranches = (pred) => { const g = [...new Set(S.branches.filter(okBr).filter(pred).map(brG))]; return g.sort((a, b) => (a === OTHER) - (b === OTHER) || BR_ORDER(a) - BR_ORDER(b)); };
   const AGING = [
-    { k: 0, name: 'ยังไม่ครบกำหนด', color: C.aqua },
-    { k: 1, name: '1–30 วัน', color: C.sky },
-    { k: 2, name: '31–60 วัน', color: '#4F8FC0' },
-    { k: 3, name: '61–90 วัน', color: C.navy },
-    { k: 4, name: '> 90 วัน', color: C.deep },
-    { k: 9, name: 'ไม่มีวันครบกำหนด (รอตรวจสอบ)', color: C.neutral },
+    { k: 0, name: 'ยังไม่ครบกำหนด', v: 'ag0' },
+    { k: 1, name: '1–30 วัน', v: 'ag1' },
+    { k: 2, name: '31–60 วัน', v: 'ag2' },
+    { k: 3, name: '61–90 วัน', v: 'ag3' },
+    { k: 4, name: '> 90 วัน', v: 'ag4' },
+    { k: 9, name: 'ไม่มีวันครบกำหนด (รอตรวจสอบ)', v: 'neutral' },
   ];
+  // อ่านสีกราฟจาก CSS variables ของธีมปัจจุบัน (สว่าง/มืด)
+  function readTheme() {
+    const cs = getComputedStyle(document.documentElement), v = (n) => cs.getPropertyValue('--ch-' + n).trim();
+    Object.assign(C, { navy: v('br1'), oliveChart: v('br2'), sky: v('sky'), neutral: v('neutral'), disc: v('disc'), text2: v('text'), body: v('fg'), line: v('axis'), grid: v('grid'), surface: v('surface'),
+      ag0: v('ag0'), ag1: v('ag1'), ag2: v('ag2'), ag3: v('ag3'), ag4: v('ag4') });
+    AGING.forEach((g) => { g.color = C[g.v]; });
+    baseText.color = C.text2;
+  }
   const TH_M = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
   const TY_NAME = { T1: 'T1', T2: 'T2', 'T2.1': 'T2.1', 'T2.2': 'T2.2 กปภ.', 'T2.3': 'T2.3 หอถัง', T3: 'T3', 'T3.1': 'T3.1 ทอท.', 'ชั่วคราว-ไม้ขาว': 'ชั่วคราว', '?': 'ไม่ระบุ/รอตรวจสอบ' };
   const CH_NAME = { transfer: 'โอน', direct: 'หักบัญชี', cash: 'เงินสด', cheque: 'เช็ค', scan: 'สแกนจ่าย', '?': 'ไม่ระบุ' };
@@ -195,18 +203,19 @@
   // ---------- chart helpers ----------
   function disposeCharts() { S.charts.forEach((c) => c.dispose()); S.charts = []; }
   const baseText = { fontFamily: 'Prompt', color: C.text2, fontSize: 12 };
+  const REDUCED = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   function chart(el, opt) {
     const c = echarts.init(el, null, { renderer: 'svg' });
     c.setOption(Object.assign({
-      textStyle: baseText, animationDuration: 300,
+      textStyle: baseText, animationDuration: REDUCED ? 0 : 900, animationEasing: 'cubicOut', animationDurationUpdate: 500, animationDelay: (i) => (REDUCED ? 0 : i * 25),
       grid: { left: 8, right: 16, top: 36, bottom: 8, containLabel: true },
       legend: { top: 0, left: 0, textStyle: { ...baseText, color: C.body, fontSize: 12.5 }, itemWidth: 12, itemHeight: 12, icon: 'roundRect' },
-      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, textStyle: { fontFamily: 'Prompt', color: C.body, fontSize: 13 }, borderColor: C.line, confine: true },
+      tooltip: chartTT(),
     }, opt));
     S.charts.push(c);
     return c;
   }
-  const valAxis = (fmt) => ({ type: 'value', axisLabel: { ...baseText, formatter: fmt || ((v) => nf2.format(v / 1e6)) }, splitLine: { lineStyle: { color: '#EEF1F5' } } });
+  const valAxis = (fmt) => ({ type: 'value', axisLabel: { ...baseText, formatter: fmt || ((v) => nf2.format(v / 1e6)) }, splitLine: { lineStyle: { color: C.grid } } });
   const catAxis = (cats) => ({ type: 'category', data: cats, axisTick: { show: false }, axisLine: { lineStyle: { color: C.line } }, axisLabel: { ...baseText } });
   const ttMoney = (unit) => (ps) => {
     const arr = Array.isArray(ps) ? ps : [ps];
@@ -214,7 +223,7 @@
     const lines = arr.filter((p) => p.value != null).map((p) => { tot += Number(p.value) || 0; return `${p.marker}${esc(p.seriesName)} <b style="float:right;margin-left:16px">${unit === 'u' ? int(p.value) : baht(p.value)}</b>`; });
     return `<div style="min-width:220px"><b>${esc(arr[0].axisValueLabel || arr[0].name)}</b><br>${lines.join('<br>')}${arr.length > 1 && !arr.some((p) => p.seriesType === 'line') ? `<br><span style="border-top:1px solid #ddd;display:block;margin-top:4px">รวม <b style="float:right">${unit === 'u' ? int(tot) : baht(tot)}</b></span>` : ''}</div>`;
   };
-  const barStyle = (color) => ({ color, borderColor: '#fff', borderWidth: 1 });
+  const barStyle = (color) => ({ color, borderColor: C.surface, borderWidth: 1 });
 
   // ---------- generic UI ----------
   function card(id, title, hint, applies, body, opts = {}) {
@@ -227,7 +236,7 @@
   }
   function table(cols, rows, foot, opts = {}) {
     const th = cols.map((c) => `<th class="${c.n ? 'n' : ''}" scope="col">${c.h}</th>`).join('');
-    const tr = rows.map((r, i) => `<tr ${opts.click ? `class="click" tabindex="0" data-row="${i}"` : ''}>${cols.map((c) => `<td class="${c.n ? 'n' : ''}${c.nw ? ' nw' : ''}">${c.f ? c.f(r) : esc(r[c.k])}</td>`).join('')}</tr>`).join('');
+    const tr = rows.map((r, i) => `<tr ${opts.click ? `class="click" tabindex="0" data-row="${i}"` : ''}>${cols.map((c) => `<td class="${c.n ? 'n' : ''}${c.nw ? ' nw' : ''}${c.cls ? ' ' + c.cls : ''}">${c.f ? c.f(r) : esc(r[c.k])}</td>`).join('')}</tr>`).join('');
     const tf = foot ? `<tfoot><tr>${cols.map((c, i) => `<td class="${c.n ? 'n' : ''}">${foot[i] == null ? '' : foot[i]}</td>`).join('')}</tr></tfoot>` : '';
     if (!rows.length) return '<div class="state">ไม่มีข้อมูลตามตัวกรองที่เลือก</div>';
     return `<div class="tbl-wrap"><table class="t" data-csvable="1"><thead><tr>${th}</tr></thead><tbody>${tr}</tbody>${tf}</table></div>`;
@@ -277,6 +286,7 @@
     $('fresh').innerHTML = `${mode}<br>
       ข้อมูลล่าสุดในฐานข้อมูล: ใบแจ้งหนี้ออกถึง <b>${dLabel(m.invoice_last_issue)}</b> (บันทึกล่าสุด ${dLabel(m.invoice_last_created)} ${esc((m.invoice_last_created || '').slice(11))} น.) · ใบเสร็จถึง <b>${dLabel(m.receipt_last)}</b> (บันทึกล่าสุด ${esc((m.receipt_last_created || '').slice(11))} น.)<br>
       วันอ้างอิงลูกหนี้: <b>${dLabel(S.asof)}</b> · เวลาดึงข้อมูล: <b>${S.fetched ? new Date(S.fetched).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Bangkok' }) + ' น.' : '–'}</b>`;
+    $('asof-chip').innerHTML = `<span class="mode ${cfg.mode === 'live' ? 'live' : 'snapshot'}">${cfg.mode === 'live' ? 'LIVE' : 'SNAPSHOT'}</span> ข้อมูล ณ ${dLabel(cfg.mode === 'live' ? m.receipt_last : S.asof)} · <a href="#fresh">ที่มาของข้อมูล</a>`;
     const msgs = [];
     if (S.f.to === S.partialMonth) msgs.push(`เดือน ${mLong(S.partialMonth)} ยังไม่ครบเดือน (ข้อมูลถึง ${dLabel(S.asof)}) — ไม่แสดงการเปรียบเทียบ MoM/YoY ของช่วงนี้`);
     const banner = $('banner');
@@ -285,13 +295,39 @@
 
   // ---------- pages ----------
   const PAGES = { overview: pOverview, sales: pSales, customers: pCustomers, collections: pCollections, quality: pQuality };
-  function render() {
+  function render(opts = {}) {
+    readTheme();
     disposeCharts();
     renderFresh();
     document.querySelectorAll('#nav a').forEach((a) => { if (a.dataset.page === S.page) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
     const el = $('page');
     try { PAGES[S.page](el); } catch (e) { console.error(e); el.innerHTML = `<div class="card state err">แสดงผลไม่สำเร็จ: ${esc(e.message)}</div>`; }
     wireCardTools(el);
+    // ลูกเล่น: การ์ดค่อย ๆ เลื่อนขึ้นเมื่อเปลี่ยนหน้า และตัวเลข KPI นับขึ้น
+    el.classList.remove('enter');
+    if (opts.enter && !REDUCED) { el.querySelectorAll('.card, .sec-title').forEach((c, i) => c.style.setProperty('--i', Math.min(i, 14))); void el.offsetWidth; el.classList.add('enter'); }
+    if (!opts.still) countUp(el);
+  }
+  function countUp(root) {
+    if (REDUCED) return;
+    root.querySelectorAll('.kpi .value').forEach((v) => {
+      const node = v.firstChild;
+      if (!node || node.nodeType !== 3) return;
+      const txt = node.nodeValue.trim(), m = txt.match(/^(-?)([\d,]+)(\.(\d+))?(%?)$/);
+      if (!m) return;
+      const target = Number(m[2].replace(/,/g, '') + (m[3] || '')) * (m[1] ? -1 : 1), dec = m[4] ? m[4].length : 0, pctSign = m[5];
+      const fmt = new Intl.NumberFormat('th-TH', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+      const t0 = performance.now(), dur = 900;
+      const step = (t) => { const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3); node.nodeValue = fmt.format(target * e) + pctSign; if (k < 1) requestAnimationFrame(step); else node.nodeValue = txt; };
+      requestAnimationFrame(step);
+    });
+  }
+  function initTheme() {
+    const btns = document.querySelectorAll('.seg button');
+    const sync = () => { const p = window.HEATheme ? HEATheme.get() : 'auto'; btns.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.t === p))); };
+    btns.forEach((b) => b.addEventListener('click', () => { if (window.HEATheme) HEATheme.set(b.dataset.t); }));
+    document.addEventListener('hea-theme', () => { sync(); if (S.d.meta) render({ still: true }); });
+    sync();
   }
 
   const APPLY_SALES = 'ช่วงเดือน · สาขา · ประเภทลูกค้า';
@@ -351,7 +387,7 @@
     custChart('ch-custov', 'c-custov', from, to);
   }
   const round2 = (v) => Math.round(v * 100) / 100;
-  const chartTT = () => ({ trigger: 'axis', axisPointer: { type: 'shadow' }, textStyle: { fontFamily: 'Prompt', color: C.body, fontSize: 13 }, borderColor: C.line, confine: true });
+  function chartTT() { return { trigger: 'axis', axisPointer: { type: 'shadow' }, backgroundColor: C.surface, textStyle: { fontFamily: 'Prompt', color: C.body, fontSize: 13 }, borderColor: C.line, confine: true }; }
 
   function latestActive(m) { return sum(S.cust.filter((r) => r.m === m && okBr(r.br) && okTy(r.ty)), (r) => r.active); }
   function cohortAgg(a, b) {
@@ -427,7 +463,7 @@
       ['ค่าน้ำ', C.navy, (m) => salesAgg(m, m).water],
       ['ค่าบริการรายเดือน', C.sky, (m) => salesAgg(m, m).service],
       ['งานขาย/บริการอื่น', C.oliveChart, (m) => salesAgg(m, m).fee],
-      ['ส่วนลด', '#B9C2CF', (m) => -salesAgg(m, m).disc],
+      ['ส่วนลด', C.disc, (m) => -salesAgg(m, m).disc],
       ['ใบลดหนี้', C.neutral, (m) => salesAgg(m, m).cn],
     ].map(([name, color, f]) => ({ name, type: 'bar', stack: 'c', barMaxWidth: 34, itemStyle: barStyle(color), data: months.map((m) => round2(f(m))) }));
     chart($('ch-comp'), { legend: { ...chartLegend(), type: 'scroll' }, xAxis: catAxis(months.map(mLabel)), yAxis: valAxis(), series: comp, tooltip: { ...chartTT(), formatter: ttMoney() } });
@@ -463,7 +499,7 @@
 
     const top = S.top.filter((r) => okBr(r.br) && okTy(r.ty));
     $('t-top').innerHTML = table([
-      { h: '#', n: 1, k: 'rk' }, { h: 'ทะเบียน', nw: 1, k: 'reg' }, { h: 'ชื่อ', f: nameCell }, { h: 'สาขา', nw: 1, k: 'br' }, { h: 'ประเภท', nw: 1, f: (r) => esc(TY_NAME[r.ty] || r.ty) },
+      { h: '#', n: 1, k: 'rk' }, { h: 'ทะเบียน', nw: 1, k: 'reg' }, { h: 'ชื่อ', f: nameCell, cls: 'name' }, { h: 'สาขา', nw: 1, k: 'br' }, { h: 'ประเภท', nw: 1, f: (r) => esc(TY_NAME[r.ty] || r.ty) },
       { h: '12 เดือนล่าสุด (บาท)', n: 1, f: (r) => baht(r.net) }, { h: '12 เดือนก่อนหน้า', n: 1, f: (r) => baht(r.prev) },
       { h: 'เปลี่ยนแปลง', n: 1, f: (r) => r.prev ? cmpPill(r.net, r.prev, '') : '–' },
       { h: 'ลบ.ม.', n: 1, f: (r) => int(r.units) }, { h: 'ค้างชำระ', n: 1, f: (r) => baht(r.ar) },
@@ -518,7 +554,7 @@
     chartTable('c-new', months.map(mLabel), ns.map((s) => ({ name: s.name, data: s.data })), 'u');
     const dl = S.decl.filter((r) => okBr(r.br) && okTy(r.ty));
     $('t-decl').innerHTML = table([
-      { h: 'ทะเบียน', nw: 1, k: 'reg' }, { h: 'ชื่อ', f: nameCell }, { h: 'สาขา', nw: 1, k: 'br' }, { h: 'ประเภท', nw: 1, f: (r) => esc(TY_NAME[r.ty] || r.ty) }, { h: 'สถานะ', nw: 1, f: (r) => esc(STATUS_TH[r.status] || r.status) },
+      { h: 'ทะเบียน', nw: 1, k: 'reg' }, { h: 'ชื่อ', f: nameCell, cls: 'name' }, { h: 'สาขา', nw: 1, k: 'br' }, { h: 'ประเภท', nw: 1, f: (r) => esc(TY_NAME[r.ty] || r.ty) }, { h: 'สถานะ', nw: 1, f: (r) => esc(STATUS_TH[r.status] || r.status) },
       { h: '3 เดือนล่าสุด (บาท)', n: 1, f: (r) => baht(r.cur) }, { h: 'ปีก่อน (บาท)', n: 1, f: (r) => baht(r.prev) },
       { h: 'เปลี่ยนแปลง', n: 1, f: (r) => cmpPill(r.cur, r.prev, '') }, { h: 'ลบ.ม. ล่าสุด / ปีก่อน', n: 1, f: (r) => int(r.ucur) + ' / ' + int(r.uprev) },
     ], dl);
@@ -597,7 +633,7 @@
 
     const dt = S.debt.filter((r) => okBr(r.br) && okTy(r.ty)).slice(0, 10);
     $('t-debt').innerHTML = table([
-      { h: 'ทะเบียน', nw: 1, k: 'reg' }, { h: 'ชื่อ', f: nameCell }, { h: 'สาขา', nw: 1, k: 'br' }, { h: 'ประเภท', nw: 1, f: (r) => esc(TY_NAME[r.ty] || r.ty) }, { h: 'สถานะ', nw: 1, f: (r) => esc(STATUS_TH[r.status] || r.status) },
+      { h: 'ทะเบียน', nw: 1, k: 'reg' }, { h: 'ชื่อ', f: nameCell, cls: 'name' }, { h: 'สาขา', nw: 1, k: 'br' }, { h: 'ประเภท', nw: 1, f: (r) => esc(TY_NAME[r.ty] || r.ty) }, { h: 'สถานะ', nw: 1, f: (r) => esc(STATUS_TH[r.status] || r.status) },
       { h: 'เกินกำหนด (บาท)', n: 1, f: (r) => baht(r.overdue) }, { h: '1–30', n: 1, f: (r) => baht(r.b1) }, { h: '31–60', n: 1, f: (r) => baht(r.b2) }, { h: '61–90', n: 1, f: (r) => baht(r.b3) }, { h: '> 90', n: 1, f: (r) => baht(r.b4) },
       { h: 'คงค้างทั้งหมด', n: 1, f: (r) => baht(r.ar) }, { h: 'ครบกำหนดเก่าสุด', nw: 1, f: (r) => dLabel(r.oldest) },
     ], dt, null, { click: 1 });
@@ -667,8 +703,9 @@
   // ---------- routing ----------
   function route() {
     const p = (location.hash || '#overview').slice(1);
+    if (p === 'fresh') { $('fresh').scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth' }); history.replaceState(null, '', '#' + S.page); return; }
     S.page = PAGES[p] ? p : 'overview';
-    render();
+    render({ enter: true });
     $('page').focus({ preventScroll: true });
   }
 
@@ -678,6 +715,7 @@
       await load(S.cfg.mode === 'live' ? S.cfg.asof_default : null);
       S.d._start = S.cfg.snapshot && S.cfg.snapshot.start;
       initFilters();
+      initTheme();
       window.addEventListener('hashchange', route);
       window.addEventListener('resize', () => S.charts.forEach((c) => c.resize()));
       $('drill-close').onclick = () => $('drill').close();

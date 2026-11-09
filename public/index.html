@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>HEA Sales Executive Dashboard</title>
+<script src="theme.js"></script>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -31,8 +32,15 @@
       <div class="titles">
         <h1>HEA Sales Executive Dashboard</h1>
         <p class="subtitle">ภาพรวมยอดขายและการจัดเก็บธุรกิจน้ำประปา</p>
+        <div class="asof-chip" id="asof-chip">กำลังโหลดข้อมูล…</div>
       </div>
-      <div class="fresh" id="fresh" aria-live="polite">กำลังโหลดข้อมูล…</div>
+      <div class="top-tools">
+        <div class="seg" role="group" aria-label="ธีมการแสดงผล">
+          <button type="button" data-t="auto" aria-pressed="false" title="ตามการตั้งค่าของเครื่อง">อัตโนมัติ</button>
+          <button type="button" data-t="light" aria-pressed="false">☀ สว่าง</button>
+          <button type="button" data-t="dark" aria-pressed="false">☾ มืด</button>
+        </div>
+      </div>
     </header>
 
     <section class="filters" aria-label="ตัวกรอง">
@@ -51,6 +59,7 @@
     <div class="banner" id="banner" hidden></div>
 
     <div id="page" class="page" tabindex="-1"></div>
+    <section class="fresh" id="fresh" aria-label="ที่มาและเวลาของข้อมูล">กำลังโหลดข้อมูล…</section>
     <footer class="foot">
       ตัวเลขเงินเป็นบาท · ยอดขายไม่รวม VAT และไม่รวมเงินประกัน · ยอดรับชำระตามใบเสร็จรวม VAT · ชื่อบุคคลธรรมดาถูกปิดตาม PDPA
     </footer>
