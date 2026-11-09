@@ -342,7 +342,7 @@
   }
 
   // ---------- pages ----------
-  const PAGES = { overview: pOverview, revenue: pRevenue, sales: pSales, usage: pUsage, customers: pCustomers, collections: pCollections, quality: pQuality };
+  const PAGES = { snapshot: pSnapshot, overview: pOverview, revenue: pRevenue, sales: pSales, usage: pUsage, customers: pCustomers, collections: pCollections, quality: pQuality };
   function render(opts = {}) {
     readTheme();
     disposeCharts();
@@ -718,6 +718,137 @@
     });
   }
 
+  // ================= Executive Snapshot (2 หน้า A4 แนวนอน) =================
+  const SG = [
+    { k: 'T1', name: 'T1 บ้านพักอาศัย', tys: ['T1'], cat: 'g' },
+    { k: 'T2', name: 'T2 (รวม T2.1 ตำรวจ)', tys: ['T2', 'T2.1'], cat: 'g' },
+    { k: 'T3', name: 'T3 ธุรกิจ/โรงแรม', tys: ['T3'], cat: 'g' },
+    { k: 'AOT', name: 'ทอท. (สนามบิน)', tys: ['T3.1'], cat: 'c' },
+    { k: 'PWA', name: 'กปภ. (ขายส่ง)', tys: ['T2.2'], cat: 'c' },
+    { k: 'HT', name: 'หอถังสูง อบต.', tys: ['T2.3'], cat: 'c' },
+  ];
+  function snapMonth(m, tys) {
+    const rs = S.sales.filter((r) => r.m === m && okBr(r.br) && (!tys || tys.includes(r.ty)) && (tys || okTy(r.ty)));
+    const pr = rs.filter((r) => r.src === 'W' || (r.src === 'L' && r.units));
+    const nf = rs.filter((r) => r.src !== 'F');
+    const cust = tys ? sum(S.cust.filter((c) => c.m === m && okBr(c.br) && tys.includes(c.ty)), (c) => c.active) : 0;
+    return { net: sum(tys ? nf : rs, (r) => r.net), fee: sum(rs.filter((r) => r.src === 'F'), (r) => r.net), units: sum(pr, (r) => r.units), pnet: sum(pr, (r) => r.net), cust };
+  }
+  const sumM = (ms, tys) => ms.map((m) => snapMonth(m, tys)).reduce((a, x) => ({ net: a.net + x.net, fee: a.fee + x.fee, units: a.units + x.units, pnet: a.pnet + x.pnet, cust: a.cust + x.cust }), { net: 0, fee: 0, units: 0, pnet: 0, cust: 0 });
+  function spark(vals, w = 120, h = 26) {
+    const v = vals.map((x) => (x == null ? 0 : x)), mx = Math.max(...v, 1), mn = Math.min(...v, 0);
+    const pts = v.map((x, i) => `${(i / Math.max(1, v.length - 1) * (w - 4) + 2).toFixed(1)},${(h - 3 - (x - mn) / (mx - mn || 1) * (h - 6)).toFixed(1)}`).join(' ');
+    const last = pts.split(' ').pop().split(',');
+    return `<svg class="spark" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="${last[0]}" cy="${last[1]}" r="2.6" fill="currentColor"/></svg>`;
+  }
+  function verdict(cur, prev) {
+    if (!prev) return cur ? '<span class="pill up">ใหม่</span>' : '<span class="pill na">–</span>';
+    const c = (cur - prev) / Math.abs(prev);
+    if (cur === 0) return '<span class="pill down">▼ หยุด</span>';
+    return c > 0.03 ? '<span class="pill up">▲ ดีขึ้น</span>' : c < -0.03 ? '<span class="pill down">▼ แย่ลง</span>' : '<span class="pill na">● ทรงตัว</span>';
+  }
+  const sgn = (v) => (v == null ? '–' : (v >= 0 ? '+' : '') + nf1.format(v * 100) + '%');
+  const cmpCell = (a, b) => (b ? `<span class="${a >= b ? 'pos' : 'neg'}">${a >= b ? '▲' : '▼'} ${sgn((a - b) / Math.abs(b))}</span>` : '<span class="muted">–</span>');
+
+  function pSnapshot(el) {
+    const M = S.lastFull, Mp = addM(M, -1), My = addM(M, -12), Y = M.slice(0, 4), Yp = String(+Y - 1);
+    const ytdMs = monthsBetween(Y + '-01', M), ytdPs = monthsBetween(Yp + '-01', My);
+    const all = (ms) => sumM(ms, null);
+    const exP = (ms) => { const a = all(ms), p = sumM(ms, ['T2.2']); return { net: a.net - p.net, units: a.units - p.units, pnet: a.pnet - p.pnet }; };
+    const cur = all([M]), prv = all([Mp]), ly = all([My]), ytd = all(ytdMs), ytdP = all(ytdPs);
+    const xc = exP([M]), xp = exP([Mp]), xy = exP([My]), xytd = exP(ytdMs), xytdP = exP(ytdPs);
+    const pu = (a) => (a.units ? a.pnet / a.units : null);
+    const fc = forecastYear();
+    const mtd = S.partialMonth ? all([S.partialMonth]) : null;
+    const trendMs = monthsBetween(Yp + '-01', M);
+    const t3 = (k) => { const g = SG.find((x) => x.k === k); return { l3: sumM(monthsBetween(addM(M, -2), M), g.tys).net, l3y: sumM(monthsBetween(addM(My, -2), My), g.tys).net }; };
+    const rows = SG.map((g) => {
+      const c = snapMonth(M, g.tys), p = snapMonth(Mp, g.tys), y = snapMonth(My, g.tys), a = sumM(ytdMs, g.tys), b = sumM(ytdPs, g.tys), tr = t3(g.k);
+      return { g, c, p, y, a, b, tr, sp: trendMs.map((m) => snapMonth(m, g.tys).net) };
+    });
+    const feeC = all([M]).fee, feeP = all([Mp]).fee, feeY = all([My]).fee, feeA = ytd.fee, feeB = ytdP.fee;
+    const lastPwa = S.sales.filter((r) => r.ty === 'T2.2' && r.net > 0 && (r.src === 'W' || r.src === 'L')).map((r) => r.m).sort().pop();
+    // ฤดูกาล: ดัชนีรายเดือนจากปีก่อน (ไม่รวม กปภ.) = เดือน ÷ ค่าเฉลี่ยทั้งปี
+    const seasonY = S.months.includes(Yp + '-12') ? Yp : null;
+    const sIdx = seasonY ? (() => { const v = monthsBetween(seasonY + '-01', seasonY + '-12').map((m) => exP([m]).net); const avg = sum(v, (x) => x) / 12; return v.map((x) => x / avg); })() : [];
+    const hi = sIdx.length ? sIdx.map((x, i) => [x, i]).filter(([x]) => x >= 1.05).map(([, i]) => TH_M[i]) : [];
+    const lo = sIdx.length ? sIdx.map((x, i) => [x, i]).filter(([x]) => x <= 0.95).map(([, i]) => TH_M[i]) : [];
+    const t3r = rows.find((r) => r.g.k === 'T3');
+    const better = rows.filter((r) => r.tr.l3y && r.tr.l3 > r.tr.l3y * 1.03).map((r) => r.g.name.split(' ')[0]);
+    const worse = rows.filter((r) => r.tr.l3y && r.tr.l3 < r.tr.l3y * 0.97).map((r) => r.g.name.split(' ')[0]);
+    const A = actionPlan().slice(0, 4);
+    const kp = (label, v, unit, cmp, sub, cls = '') => `<div class="sk ${cls}"><div class="sk-l">${label}</div><div class="sk-v">${v}<small>${unit}</small></div>${cmp ? `<div class="sk-c">${cmp}</div>` : ''}${sub ? `<div class="sk-s">${sub}</div>` : ''}</div>`;
+    const mm = (v) => nf2.format(v / 1e6);
+    el.innerHTML = `
+      <div class="snap-tools"><button type="button" class="btn" id="snap-print">พิมพ์ / บันทึก PDF (2 หน้า)</button><span class="small muted">ใช้ตัวกรองสาขา/ประเภทด้านบนได้ · ช่วงเดือนไม่มีผล (ใช้เดือนเต็มล่าสุด)</span></div>
+      <div class="snap">
+      <section class="snap-page">
+        <header class="snap-h"><div><div class="snap-t">Executive Snapshot · รายได้ประจำเดือน ${mLong(M)}</div>
+          <div class="snap-st">บริษัท ไฮโดรเอ็นเตอร์ไพร์ส แอนด์ อะควอดีซายน์ จำกัด · ${S.f.br ? 'ตำบล' + esc(S.f.br) : 'ตำบลไม้ขาว + สาคู'}${S.f.ty ? ' · ประเภท ' + esc(TY_NAME[S.f.ty] || S.f.ty) : ''} · ไม่รวม VAT</div></div>
+          <div class="snap-asof">ข้อมูล ณ ${dLabel(S.asof)}<br>${S.cfg.mode === 'live' ? 'LIVE' : 'SNAPSHOT'} · ดึง ${S.fetched ? dLabel(S.fetched.slice(0, 10)) : '–'}</div></header>
+        <div class="sk-row">
+          ${kp(`รายได้ ${mLabel(M)}`, mm(cur.net), ' ล้านบาท', `MoM ${cmpCell(cur.net, prv.net)}<br>YoY ${cmpCell(cur.net, ly.net)}`, '', 'main')}
+          ${kp('ไม่รวม กปภ.', mm(xc.net), ' ล้านบาท', `MoM ${cmpCell(xc.net, xp.net)}<br>YoY ${cmpCell(xc.net, xy.net)}`, 'ฐานธุรกิจต่อเนื่อง')}
+          ${kp(`ปริมาณน้ำ ${mLabel(M)}`, int(cur.units), ' ลบ.ม.', `MoM ${cmpCell(cur.units, prv.units)}<br>YoY ${cmpCell(cur.units, ly.units)}`)}
+          ${kp('ราคาเฉลี่ยต่อหน่วย', nf2.format(pu(cur) || 0), ' บาท/ลบ.ม.', `MoM ${cmpCell(pu(cur), pu(prv))}<br>YoY ${cmpCell(pu(cur), pu(ly))}`, 'เปลี่ยนตามสัดส่วนลูกค้า (mix)')}
+          ${kp(`YTD ม.ค.–${TH_M[+M.slice(5) - 1]}`, mm(ytd.net), ' ล้านบาท', `YoY ${cmpCell(ytd.net, ytdP.net)}<br>ไม่รวม กปภ. ${cmpCell(xytd.net, xytdP.net)}`)}
+          ${kp(`ประมาณการทั้งปี ${+Y + 543}`, mm(fc.fc), ' ล้านบาท', fc.prev ? `เทียบปีก่อน ${cmpCell(fc.fc, fc.prev)}` : '', `MTD ${S.partialMonth ? mLabel(S.partialMonth) + ' ' + mm(mtd.net) + ' ล้าน (ถึง ' + dLabel(S.asof) + ' · บิลออกปลายเดือน)' : '–'}`)}
+        </div>
+        <table class="snap-t-tbl">
+          <thead><tr><th>กลุ่มลูกค้า</th><th class="n">${mLabel(M)}<br><small>ล้านบาท</small></th><th class="n">MoM</th><th class="n">YoY</th><th class="n">บาท/ลบ.ม.<br><small>${mLabel(M)} (ปีก่อน)</small></th><th class="n">YTD ${+Y + 543}<br><small>ล้านบาท</small></th><th class="n">YTD YoY</th><th class="n">สัดส่วน<br><small>YTD</small></th><th class="n">รายได้/ราย<br><small>/เดือน (บาท)</small></th><th>แนวโน้ม ม.ค. ${(+Yp + 543) % 100} – ${mLabel(M)}</th><th>3 เดือนล่าสุด<br><small>เทียบปีก่อน</small></th></tr></thead>
+          <tbody>
+          ${rows.map((r, i) => `${i === 3 ? '<tr class="grp"><td colspan="11">ลูกค้าสัญญารายใหญ่</td></tr>' : i === 0 ? '<tr class="grp"><td colspan="11">ลูกค้าทั่วไป (อัตราก้าวหน้า)</td></tr>' : ''}
+            <tr><td>${esc(r.g.name)}${r.g.k === 'PWA' && lastPwa && lastPwa < M ? `<br><small class="neg">บิลสุดท้าย ${mLabel(lastPwa)}</small>` : ''}</td><td class="n"><b>${mm(r.c.net)}</b></td><td class="n">${cmpCell(r.c.net, r.p.net)}</td><td class="n">${cmpCell(r.c.net, r.y.net)}</td>
+            <td class="n">${r.c.units ? nf2.format(r.c.pnet / r.c.units) : '–'} <small class="muted">(${r.y.units ? nf2.format(r.y.pnet / r.y.units) : '–'})</small></td>
+            <td class="n">${mm(r.a.net)}</td><td class="n">${cmpCell(r.a.net, r.b.net)}</td><td class="n">${pct(ytd.net ? r.a.net / ytd.net : null)}</td>
+            <td class="n">${r.g.cat === 'g' && r.c.cust ? int(r.c.net / r.c.cust) + ` <small class="muted">(${r.y.cust ? int(r.y.net / r.y.cust) : '–'})</small>` : '–'}</td>
+            <td class="sp-cell">${spark(r.sp)}</td><td>${verdict(r.tr.l3, r.tr.l3y)}</td></tr>`).join('')}
+            <tr><td>งานขาย/บริการอื่น</td><td class="n"><b>${mm(feeC)}</b></td><td class="n">${cmpCell(feeC, feeP)}</td><td class="n">${cmpCell(feeC, feeY)}</td><td class="n">–</td><td class="n">${mm(feeA)}</td><td class="n">${cmpCell(feeA, feeB)}</td><td class="n">${pct(ytd.net ? feeA / ytd.net : null)}</td><td class="n">–</td><td></td><td></td></tr>
+            <tr class="total"><td>รวมรายได้</td><td class="n">${mm(cur.net)}</td><td class="n">${cmpCell(cur.net, prv.net)}</td><td class="n">${cmpCell(cur.net, ly.net)}</td><td class="n">${nf2.format(pu(cur) || 0)} <small class="muted">(${ly.units ? nf2.format(pu(ly)) : '–'})</small></td><td class="n">${mm(ytd.net)}</td><td class="n">${cmpCell(ytd.net, ytdP.net)}</td><td class="n">100%</td><td></td><td class="sp-cell">${spark(trendMs.map((m) => all([m]).net))}</td><td>${verdict(sumM(monthsBetween(addM(M, -2), M), null).net, sumM(monthsBetween(addM(My, -2), My), null).net)}</td></tr>
+          </tbody></table>
+        <p class="snap-note">MoM = เทียบเดือนก่อน (มีผลฤดูกาล) · YoY = เทียบเดือนเดียวกันปีก่อน (ใช้ประเมินแนวโน้ม) · บาท/ลบ.ม. = รายได้ค่าน้ำ+บริการ ÷ ลบ.ม. ที่ออกบิล · รายได้/ราย = รายได้กลุ่ม ÷ ผู้ใช้น้ำที่มีบิลในเดือน · “3 เดือนล่าสุด” ดีขึ้น/แย่ลง เมื่อต่างจากปีก่อนเกิน ±3% · ยอดขาย = วันที่ออกเอกสาร หักส่วนลดและใบลดหนี้</p>
+      </section>
+      <section class="snap-page">
+        <header class="snap-h"><div><div class="snap-t">แนวโน้ม ฤดูกาล และสิ่งที่ต้องทำ</div><div class="snap-st">รายได้รายเดือนแยกกลุ่ม ม.ค. ${+Yp + 543} – ${mLong(M)} (ล้านบาท ไม่รวม VAT)</div></div><div class="snap-asof">หน้า 2/2</div></header>
+        <div class="chart snap-chart" id="ch-snap"></div>
+        <div class="snap-2col">
+          <div>
+            <h4>ฤดูกาลและภัยแล้ง</h4>
+            ${sIdx.length ? `<div class="season">${sIdx.map((x, i) => `<div class="si" style="--v:${Math.min(1.4, Math.max(0.6, x))}"><b>${TH_M[i]}</b><span>${nf2.format(x)}</span></div>`).join('')}</div>
+            <p class="small">ดัชนีฤดูกาลปี ${+seasonY + 543} (รายได้เดือน ÷ ค่าเฉลี่ยทั้งปี ไม่รวม กปภ.) · สูง: ${hi.join(' ') || '–'} · ต่ำ: ${lo.join(' ') || '–'} — ช่วงฤดูท่องเที่ยว/แล้ง ม.ค.–เม.ย. ลูกค้า T3 ใช้น้ำมากที่สุด จึงควรดู YoY แทน MoM</p>` : ''}
+            <p class="small">ภัยแล้ง พ.ค. ${(+Y + 543) % 100}: ไม่มีการส่งน้ำให้ กปภ. และ T3 ลดลงตามฤดูกาล${t3r ? ` (T3 ${mLabel(Y + '-05')} ${mm(snapMonth(Y + '-05', ['T3']).net)} ล้าน เทียบ ${mLabel(Y + '-04')} ${mm(snapMonth(Y + '-04', ['T3']).net)} ล้าน)` : ''} — ฤดูแล้งปีหน้าควรวางแผนกำลังผลิตก่อนรับลูกค้าแทน กปภ.</p>
+            <h4>แนวโน้มดีขึ้นหรือแย่ลง (3 เดือนล่าสุด เทียบปีก่อน)</h4>
+            <p class="small"><span class="pos">▲ ดีขึ้น:</span> ${better.join(', ') || '–'} · <span class="neg">▼ แย่ลง:</span> ${worse.join(', ') || '–'}<br>ไม่รวม กปภ. รายได้ YTD ${sgn(xytdP.net ? xytd.net / xytdP.net - 1 : null)} — ธุรกิจหลักยังโต แต่รายได้รวมลดเพราะ กปภ. หยุดซื้อ${lastPwa ? ` หลัง ${mLabel(lastPwa)}` : ''} ประมาณการทั้งปี ${mm(fc.fc)} ล้านบาท (${fc.method})</p>
+          </div>
+          <div>
+            <h4>สิ่งที่ต้องทำ (เรียงตามความด่วน)</h4>
+            <ol class="snap-act">${A.map((a) => `<li><b>${a.t}</b> <span class="prio p${a.p}">${a.p === 1 ? 'ด่วน' : a.p === 2 ? 'สำคัญ' : 'วางแผน'}</span><br><span class="small">${a.imp} · ${a.own}</span></li>`).join('')}</ol>
+            <p class="small muted">รายละเอียดและตารางเชิงลึกอยู่ในหน้าอื่นของ dashboard</p>
+          </div>
+        </div>
+      </section></div>`;
+    // เก็บตัวเลขชุดเดียวกันไว้ให้สร้างไฟล์นำเสนอแยก (scripts/build-present.js)
+    S.snapData = { M, Mp, My, asof: S.asof, fetched: S.fetched, br: S.f.br || null, ty: S.f.ty || null,
+      cur, prv, ly, ytd, ytdP, xc, xp, xy, xytd, xytdP, fc, mtd, partial: S.partialMonth, lastPwa,
+      rows: rows.map((r) => ({ k: r.g.k, name: r.g.name, cat: r.g.cat, c: r.c, p: r.p, y: r.y, a: r.a, b: r.b, tr: r.tr, sp: r.sp })),
+      fee: { c: feeC, p: feeP, y: feeY, a: feeA, b: feeB }, trendMs, season: { year: seasonY, idx: sIdx, hi, lo }, better, worse,
+      drought: { m: Y + '-05', t3: snapMonth(Y + '-05', ['T3']).net, t3prev: snapMonth(Y + '-04', ['T3']).net },
+      trend: [['T1', ['T1']], ['T2', ['T2', 'T2.1']], ['T3', ['T3']], ['ทอท.', ['T3.1']], ['กปภ.', ['T2.2']], ['หอถัง อบต.', ['T2.3']]].map(([n, t]) => ({ name: n, data: trendMs.map((m) => round2(snapMonth(m, t).net)) })),
+      actions: actionPlan().map((a) => ({ p: a.p, t: a.t, what: a.what.replace(/<[^>]+>/g, ''), imp: a.imp, own: a.own, kpi: a.kpi })),
+      ar: (() => { const x = arAgg(); return { total: x.total, overdue: x.overdue, b4: x.b[4] }; })() };
+    window.HEASnap = S.snapData;
+    $('snap-print').onclick = () => window.print();
+    const cats = trendMs.map(mLabel);
+    const ser = [['T1', ['T1'], C.sky], ['T2', ['T2', 'T2.1'], C.oliveChart], ['T3', ['T3'], C.navy], ['ลูกค้าสัญญา (ทอท. กปภ. หอถัง)', ['T3.1', 'T2.2', 'T2.3'], C.neutral]]
+      .map(([name, tys, color]) => ({ name, type: 'bar', stack: 's', barMaxWidth: 26, itemStyle: barStyle(color), data: trendMs.map((m) => round2(snapMonth(m, tys).net)) }));
+    const low = trendMs.filter((m) => +m.slice(5) >= 5 && +m.slice(5) <= 10);
+    const areas = [];
+    for (let i = 0; i < low.length; i++) { const s0 = low[i]; let e = s0; while (i + 1 < low.length && low[i + 1] === addM(e, 1)) e = low[++i]; areas.push([{ xAxis: mLabel(s0), itemStyle: { color: 'rgba(123,204,223,0.12)' }, label: { show: true, formatter: 'ฤดูฝน/นอกฤดูท่องเที่ยว', color: C.text2, fontFamily: 'Prompt', fontSize: 11, position: 'insideTop' } }, { xAxis: mLabel(e) }]); }
+    ser[0].markArea = { silent: true, data: areas };
+    const dm = Y + '-05';
+    if (trendMs.includes(dm)) ser[2].markPoint = { symbol: 'pin', symbolSize: 38, itemStyle: { color: C.text2 }, label: { formatter: 'แล้ง', color: '#fff', fontFamily: 'Prompt', fontSize: 10 }, data: [{ coord: [mLabel(dm), round2(sum(['T1', 'T2', 'T2.1', 'T3'], (t) => snapMonth(dm, [t]).net))] }] };
+    chart($('ch-snap'), { grid: { left: 8, right: 16, top: 40, bottom: 8, containLabel: true }, xAxis: catAxis(cats), yAxis: valAxis(), series: ser, tooltip: { ...chartTT(), formatter: ttMoney() } });
+  }
   // ================= ชั้นการตัดสินใจสำหรับผู้บริหาร =================
   // ประมาณการทั้งปี: ยอดจริงถึงเดือนเต็มล่าสุด + ค่าเฉลี่ย 3 เดือนล่าสุด x เดือนที่เหลือ (ฐานหลัง กปภ. หยุดซื้อ)
   function forecastYear() {
@@ -726,7 +857,15 @@
     const run = salesAgg(addM(lf, -2), lf).net / 3;
     const py = String(Number(y) - 1);
     const prev = S.months.includes(py + '-01') ? salesAgg(py + '-01', py + '-12').net : null;
-    return { y, left, ytd, run, fc: ytd + run * left, prev };
+    // ฤดูกาล: เดือนที่เหลือ = เดือนเดียวกันปีก่อน (ไม่รวม กปภ.) x อัตราโต YoY ไม่รวม กปภ. ของ YTD (กปภ. = 0 หลังสัญญาสิ้นสุด)
+    const exPWA = (a, b) => sum(S.sales.filter((r) => inR(r.m, a, b) && okBr(r.br) && okTy(r.ty) && r.ty !== 'T2.2'), (r) => r.net);
+    const remFrom = addM(lf, 1).replace(y, py), remTo = py + '-12';
+    if (left > 0 && S.months.includes(remTo)) {
+      const g = exPWA(y + '-01', lf) / Math.max(1, exPWA(py + '-01', addM(lf, -12)));
+      const rest = exPWA(remFrom, remTo) * g;
+      return { y, left, ytd, run, fc: ytd + rest, prev, rest, method: `ยอดจริง + ${TH_M[+remFrom.slice(5) - 1]}–ธ.ค. ปีก่อนไม่รวม กปภ. × ${nf2.format(g)}` };
+    }
+    return { y, left, ytd, run, fc: ytd + run * left, prev, method: 'ยอดจริง + เฉลี่ย 3 เดือนล่าสุด' };
   }
   function pipeAgg() {
     const P = S.d.pipeline; if (!P) return null;
@@ -780,7 +919,7 @@
     const qa = [
       ['เติบโตหรือไม่', y0 ? `ยอดขาย ม.ค.–${mLabel(lf)} ${pctTxt(chg(y1.net, y0.net))} แต่ถ้าไม่นับ กปภ. ${pctTxt(chg(e1, e0))} — ธุรกิจหลักยังโต ปัญหาคือรายได้ขายส่งที่หายไป` : '–', y0 && y1.net < y0.net ? 'warn' : 'good'],
       ['เก็บเงินได้หรือไม่', `รับชำระค่าน้ำ ${pct(y1.billWaterInclVat ? coll.water / y1.billWaterInclVat : null)} ของยอดแจ้งหนี้ · ค้างเกินกำหนด ${mb(ar.overdue)} ล้านบาท (${pct(ar.total ? ar.overdue / ar.total : null)} ของลูกหนี้)`, ar.overdue / Math.max(1, ar.total) > 0.5 ? 'bad' : 'warn'],
-      ['ทั้งปีจะจบที่เท่าไร', `ประมาณการปี ${Number(fc.y) + 543} ≈ ${mb(fc.fc)} ล้านบาท${fc.prev ? ` (ปีก่อน ${mb(fc.prev)} · ${pctTxt(chg(fc.fc, fc.prev))})` : ''} — ยอดจริง ${mb(fc.ytd)} + เฉลี่ย 3 เดือนล่าสุด ${mb(fc.run)} × ${fc.left} เดือน`, fc.prev && fc.fc < fc.prev ? 'warn' : 'good'],
+      ['ทั้งปีจะจบที่เท่าไร', `ประมาณการปี ${Number(fc.y) + 543} ≈ ${mb(fc.fc)} ล้านบาท${fc.prev ? ` (ปีก่อน ${mb(fc.prev)} · ${pctTxt(chg(fc.fc, fc.prev))})` : ''} — ${fc.method}`, fc.prev && fc.fc < fc.prev ? 'warn' : 'good'],
       ['ลูกค้าใหม่เข้าระบบทันไหม', P ? `คำร้องติดตั้งค้าง ${int(P.nOpen)} ราย (เกิน 60 วัน ${int(P.over60)}) · ติดตั้งได้ ~${nf1.format(P.perMonth)} ราย/เดือน` : 'ไม่มีข้อมูลคำร้อง', P && P.over60 > 20 ? 'warn' : 'good'],
     ];
     const icon = { good: '✓', warn: '⚠', bad: '!' };
@@ -1059,9 +1198,9 @@
 
   // ---------- routing ----------
   function route() {
-    const p = (location.hash || '#overview').slice(1);
+    const p = (location.hash || '#snapshot').slice(1);
     if (p === 'fresh') { $('fresh').scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth' }); history.replaceState(null, '', '#' + S.page); return; }
-    S.page = PAGES[p] ? p : 'overview';
+    S.page = PAGES[p] ? p : 'snapshot';
     render({ enter: true });
     $('page').focus({ preventScroll: true });
   }
@@ -1073,6 +1212,10 @@
       S.d._start = S.cfg.snapshot && S.cfg.snapshot.start;
       initFilters();
       initTheme();
+      const nt = $('nav-toggle');
+      const syncNav = () => nt.setAttribute('aria-expanded', String(!document.documentElement.classList.contains('nav-off')));
+      nt.onclick = () => { const off = document.documentElement.classList.toggle('nav-off'); try { localStorage.setItem('hea-dash-nav', off ? 'off' : 'on'); } catch (e) {} syncNav(); setTimeout(() => S.charts.forEach((c) => c.resize()), 260); };
+      syncNav();
       window.addEventListener('hashchange', route);
       window.addEventListener('resize', () => S.charts.forEach((c) => c.resize()));
       $('drill-close').onclick = () => $('drill').close();

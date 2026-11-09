@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>สรุปรายได้ผู้บริหาร</title>
+<style>
+/*__FONTS__*/
+:root {
+  --paper: #F4F1EA; --ink: #15171C; --ink-2: #4B4F58; --ink-3: #7A7F89; --rule: #D9D3C7; --card: #FBFAF6;
+  --teal: #0E6B6B; --teal-2: #3E9C96; --teal-3: #9FD0C9; --sand: #C9A36A; --coral: #D8513A; --green: #2E7D4F; --grey: #A39E94;
+  --font: 'Plex Thai', 'Noto Sans Thai', system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: #2B2D33; font-family: var(--font); color: var(--ink); font-variant-numeric: tabular-nums; }
+.deck { position: fixed; inset: 0; display: grid; place-items: center; }
+.slide { position: absolute; width: 1280px; height: 720px; background: var(--paper); padding: 40px 56px 34px; display: none; flex-direction: column; transform-origin: center center; box-shadow: 0 20px 60px rgba(0,0,0,.35); overflow: hidden; }
+.slide.on { display: flex; animation: in .45s cubic-bezier(.2,.7,.2,1); }
+@keyframes in { from { opacity: 0; transform: var(--scale) translateY(12px); } to { opacity: 1; transform: var(--scale); } }
+.kicker { font-size: 14px; letter-spacing: .14em; text-transform: uppercase; color: var(--teal); font-weight: 600; }
+h1 { font-size: 40px; line-height: 1.2; margin: 6px 0 4px; font-weight: 600; letter-spacing: -.01em; }
+h2 { font-size: 28px; line-height: 1.25; margin: 4px 0 8px; font-weight: 600; }
+.lede { font-size: 19px; color: var(--ink-2); margin: 0; max-width: 1050px; line-height: 1.5; }
+.lede b { color: var(--ink); }
+.foot { margin-top: auto; display: flex; justify-content: space-between; font-size: 12px; color: var(--ink-3); border-top: 1px solid var(--rule); padding-top: 8px; }
+.pos { color: var(--green); font-weight: 600; } .neg { color: var(--coral); font-weight: 600; } .mut { color: var(--ink-3); }
+/* slide 1 */
+.hero { display: grid; grid-template-columns: 1.1fr 1.9fr; gap: 34px; margin-top: 26px; align-items: stretch; }
+.big { background: var(--ink); color: #fff; border-radius: 18px; padding: 28px 30px; display: flex; flex-direction: column; justify-content: space-between; }
+.big .l { font-size: 16px; color: #C9CDD6; }
+.big .v { font-size: 92px; font-weight: 600; line-height: 1; margin: 10px 0 2px; letter-spacing: -.02em; }
+.big .u { font-size: 20px; color: #C9CDD6; }
+.big .cmp { display: flex; gap: 12px; margin-top: 18px; }
+.chip { border-radius: 999px; padding: 6px 14px; font-size: 16px; font-weight: 600; background: rgba(255,255,255,.1); }
+.chip.pos { color: #8FE0B2; } .chip.neg { color: #FF9F8C; }
+.big .note { font-size: 13px; color: #AEB3BD; margin-top: 16px; line-height: 1.5; }
+.tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.tile { background: var(--card); border: 1px solid var(--rule); border-radius: 14px; padding: 16px 18px; }
+.tile .l { font-size: 14px; color: var(--ink-2); }
+.tile .v { font-size: 34px; font-weight: 600; margin: 6px 0 2px; line-height: 1.1; white-space: nowrap; }
+.tile .v small { font-size: 14px; color: var(--ink-3); font-weight: 400; margin-left: 4px; }
+.tile .c { font-size: 13px; white-space: nowrap; } .tile .s { font-size: 12.5px; color: var(--ink-3); margin-top: 4px; line-height: 1.4; }
+.tile.accent { background: #E3EFEC; border-color: #BFDAD4; }
+/* slide 2 table */
+table { width: 100%; border-collapse: collapse; font-size: 14.5px; margin-top: 0; }
+th { text-align: left; font-size: 12.5px; color: var(--ink-3); font-weight: 600; padding: 8px 8px; border-bottom: 2px solid var(--ink); white-space: nowrap; letter-spacing: .02em; }
+td { padding: 5px 8px; border-bottom: 1px solid var(--rule); vertical-align: middle; }
+.n { text-align: right; white-space: nowrap; }
+tr.sec td { font-size: 12px; color: var(--teal); font-weight: 600; letter-spacing: .08em; padding-top: 8px; padding-bottom: 2px; border-bottom: 0; }
+tr.tot td { font-weight: 600; border-top: 2px solid var(--ink); border-bottom: 0; background: #ECE7DC; }
+.name b { display: inline; } .name small { display: block; color: var(--ink-3); font-size: 11.5px; line-height: 1.3; }
+.verdict { display: inline-block; border-radius: 999px; padding: 3px 12px; font-size: 13.5px; font-weight: 600; white-space: nowrap; }
+.verdict.up { background: #DCEFE3; color: var(--green); } .verdict.down { background: #F8DDD6; color: var(--coral); } .verdict.flat { background: #E9E5DC; color: var(--ink-2); }
+svg.spark { display: block; color: var(--teal); }
+/* slide 3 */
+.trend { display: grid; grid-template-columns: 2.1fr 1fr; gap: 28px; margin-top: 4px; flex: 1; min-height: 0; }
+.legend { display: flex; gap: 16px; font-size: 13.5px; color: var(--ink-2); flex-wrap: wrap; margin-bottom: 6px; }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.side h3 { font-size: 17px; margin: 0 0 8px; }
+.gl { display: grid; gap: 7px; margin-bottom: 18px; }
+.gl div { display: flex; justify-content: space-between; align-items: center; font-size: 15px; border-bottom: 1px dashed var(--rule); padding-bottom: 5px; }
+.season { display: grid; grid-template-columns: repeat(12, 1fr); gap: 3px; margin: 6px 0 8px; }
+.season div { text-align: center; border-radius: 6px; padding: 5px 0 4px; font-size: 11.5px; }
+.season b { display: block; font-size: 11px; font-weight: 600; }
+.side p { font-size: 13.5px; color: var(--ink-2); line-height: 1.55; margin: 0 0 8px; }
+/* slide 4 */
+.acts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 8px; }
+.act { background: var(--card); border: 1px solid var(--rule); border-radius: 14px; padding: 12px 16px; display: grid; grid-template-columns: 44px 1fr; gap: 12px; }
+.act .no { width: 40px; height: 40px; border-radius: 50%; background: var(--ink); color: #fff; display: grid; place-items: center; font-weight: 600; font-size: 18px; }
+.act.p1 .no { background: var(--coral); } .act.p2 .no { background: var(--sand); }
+.act h4 { margin: 0 0 4px; font-size: 18px; }
+.act .imp { font-size: 15px; font-weight: 600; color: var(--teal); margin: 2px 0 4px; }
+.act p { margin: 0; font-size: 13px; color: var(--ink-2); line-height: 1.5; }
+.act .own { font-size: 12.5px; color: var(--ink-3); margin-top: 6px; }
+/* nav */
+.nav { position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; align-items: center; background: rgba(20,22,27,.75); color: #fff; padding: 6px 10px; border-radius: 999px; font-size: 13px; z-index: 5; }
+.nav button { background: transparent; color: #fff; border: 1px solid rgba(255,255,255,.35); border-radius: 999px; padding: 4px 12px; cursor: pointer; font-family: inherit; }
+.dots { display: flex; gap: 6px; } .dots span { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,.35); cursor: pointer; } .dots span.on { background: #fff; }
+@media print {
+  @page { size: 297mm 167.06mm; margin: 0; }
+  html, body { background: #fff; height: auto; }
+  .deck { position: static; display: block; }
+  .slide { position: relative; display: flex !important; transform: none !important; box-shadow: none; animation: none !important; break-after: page; page-break-after: always; width: 1280px; height: 720px; zoom: 0.8771; }
+  .nav { display: none; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+@media (prefers-reduced-motion: reduce) { .slide.on { animation: none; } }
+</style>
+</head>
+<body>
+<div class="deck" id="deck"></div>
+<div class="nav"><button id="prev" aria-label="ก่อนหน้า">‹</button><div class="dots" id="dots"></div><span id="cnt"></span><button id="next" aria-label="ถัดไป">›</button><button id="fs">เต็มจอ</button></div>
+<script>
+const D = /*__DATA__*/null;
+(function () {
+  const TH = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  const ml = (m) => TH[+m.slice(5) - 1] + ' ' + String((+m.slice(0, 4) + 543) % 100);
+  const mL = (m) => TH[+m.slice(5) - 1] + ' ' + (+m.slice(0, 4) + 543);
+  const dl = (d) => { const [y, m, x] = d.slice(0, 10).split('-').map(Number); return x + ' ' + TH[m - 1] + ' ' + (y + 543); };
+  const f2 = new Intl.NumberFormat('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const f1 = new Intl.NumberFormat('th-TH', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const f0 = new Intl.NumberFormat('th-TH', { maximumFractionDigits: 0 });
+  const mb = (v) => f2.format(v / 1e6);
+  const ch = (a, b) => (b ? (a - b) / Math.abs(b) : null);
+  const pc = (v) => (v == null ? '–' : (v >= 0 ? '+' : '') + f1.format(v * 100) + '%');
+  const cc = (a, b) => { const v = ch(a, b); return v == null ? '<span class="mut">–</span>' : `<span class="${v >= 0 ? 'pos' : 'neg'}">${v >= 0 ? '▲' : '▼'} ${pc(v)}</span>`; };
+  const pu = (x) => (x && x.units ? x.pnet / x.units : null);
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const verdict = (t) => { if (!t.l3y) return '<span class="verdict flat">–</span>'; if (!t.l3) return '<span class="verdict down">▼ หยุด</span>'; const v = t.l3 / t.l3y - 1; return v > 0.03 ? `<span class="verdict up">▲ ดีขึ้น ${pc(v)}</span>` : v < -0.03 ? `<span class="verdict down">▼ แย่ลง ${pc(v)}</span>` : `<span class="verdict flat">● ทรงตัว ${pc(v)}</span>`; };
+  function spark(v, w = 130, h = 30) {
+    const mx = Math.max(...v, 1), mn = Math.min(...v, 0);
+    const p = v.map((x, i) => [(i / (v.length - 1)) * (w - 6) + 3, h - 4 - ((x - mn) / (mx - mn || 1)) * (h - 8)]);
+    return `<svg class="spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><polyline fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" points="${p.map((q) => q.map((n) => n.toFixed(1)).join(',')).join(' ')}"/><circle cx="${p[p.length - 1][0].toFixed(1)}" cy="${p[p.length - 1][1].toFixed(1)}" r="3" fill="currentColor"/></svg>`;
+  }
+  const M = D.M, Y = +M.slice(0, 4), scope = (D.br ? 'ตำบล' + D.br : 'ตำบลไม้ขาว + สาคู') + ' · ไม่รวม VAT';
+  const foot = (n) => `<div class="foot"><span>บริษัท ไฮโดรเอ็นเตอร์ไพร์ส แอนด์ อะควอดีซายน์ จำกัด · ${scope}</span><span>ข้อมูล ณ ${dl(D.asof)} · ${n}/4</span></div>`;
+  const G = Object.fromEntries(D.rows.map((r) => [r.k, r]));
+  const slides = [];
+
+  // ---------- 1. Snapshot ----------
+  const pwaNote = D.lastPwa && D.lastPwa < M ? `กปภ. หยุดซื้อน้ำหลัง ${ml(D.lastPwa)}` : '';
+  slides.push(`
+    <div class="kicker">Executive Snapshot · ${mL(M)}</div>
+    <h1>ธุรกิจหลักโต ${pc(ch(D.xytd.net, D.xytdP.net))} แต่รายได้รวม ${pc(ch(D.ytd.net, D.ytdP.net))}${pwaNote ? ' เพราะ' + pwaNote : ''}</h1>
+    <p class="lede">เดือนล่าสุดที่ปิดรอบบิลแล้วคือ <b>${mL(M)}</b> · T3 (ธุรกิจ/โรงแรม) ยังเป็นตัวขับหลัก ${pc(ch(G.T3.c.net, G.T3.y.net))} จากปีก่อน</p>
+    <div class="hero">
+      <div class="big"><div><div class="l">รายได้ ${mL(M)}</div><div class="v">${mb(D.cur.net)}</div><div class="u">ล้านบาท</div>
+        <div class="cmp"><span class="chip ${D.cur.net >= D.prv.net ? 'pos' : 'neg'}">MoM ${pc(ch(D.cur.net, D.prv.net))}</span><span class="chip ${D.cur.net >= D.ly.net ? 'pos' : 'neg'}">YoY ${pc(ch(D.cur.net, D.ly.net))}</span></div></div>
+        <div class="note">MTD ${D.partial ? ml(D.partial) + ' (ถึง ' + dl(D.asof) + '): ' + mb(D.mtd.net) + ' ล้านบาท — บิลค่าน้ำออกช่วงปลายเดือน ตัวเลข MTD จึงยังไม่สะท้อนเดือนนี้' : '–'}</div></div>
+      <div class="tiles">
+        <div class="tile accent"><div class="l">ไม่รวม กปภ.</div><div class="v">${mb(D.xc.net)}<small>ล้านบาท</small></div><div class="c">MoM ${cc(D.xc.net, D.xp.net)} · YoY ${cc(D.xc.net, D.xy.net)}</div><div class="s">ฐานรายได้ที่ยังต่อเนื่อง</div></div>
+        <div class="tile"><div class="l">ปริมาณน้ำที่ขาย</div><div class="v">${f0.format(D.cur.units)}<small>ลบ.ม.</small></div><div class="c">MoM ${cc(D.cur.units, D.prv.units)} · YoY ${cc(D.cur.units, D.ly.units)}</div><div class="s">${f0.format(D.cur.units / new Date(Date.UTC(Y, +M.slice(5), 0)).getUTCDate())} ลบ.ม./วัน</div></div>
+        <div class="tile"><div class="l">ราคาเฉลี่ยต่อหน่วย</div><div class="v">${f2.format(pu(D.cur))}<small>บาท/ลบ.ม.</small></div><div class="c">MoM ${cc(pu(D.cur), pu(D.prv))} · YoY ${cc(pu(D.cur), pu(D.ly))}</div><div class="s">สูงขึ้นเพราะสัดส่วน T3 มากขึ้น และไม่มีน้ำขายส่งราคาต่ำ</div></div>
+        <div class="tile"><div class="l">YTD ม.ค.–${TH[+M.slice(5) - 1]}</div><div class="v">${mb(D.ytd.net)}<small>ล้านบาท</small></div><div class="c">YoY ${cc(D.ytd.net, D.ytdP.net)}</div><div class="s">ไม่รวม กปภ. ${cc(D.xytd.net, D.xytdP.net)}</div></div>
+        <div class="tile"><div class="l">ประมาณการทั้งปี ${Y + 543}</div><div class="v">${mb(D.fc.fc)}<small>ล้านบาท</small></div><div class="c">เทียบปีก่อน ${cc(D.fc.fc, D.fc.prev)}</div><div class="s">${esc(D.fc.method)}</div></div>
+        <div class="tile"><div class="l">ลูกหนี้เกินกำหนด</div><div class="v">${mb(D.ar.overdue)}<small>ล้านบาท</small></div><div class="c"><span class="mut">จากคงค้าง ${mb(D.ar.total)} ล้าน</span></div><div class="s">เกิน 90 วัน ${mb(D.ar.b4)} ล้านบาท</div></div>
+      </div>
+    </div>
+    ${foot(1)}`);
+
+  // ---------- 2. แยกกลุ่ม ----------
+  const row = (r, extra) => `<tr><td class="name"><b>${esc(r.name)}</b>${extra || ''}</td><td class="n"><b>${mb(r.c.net)}</b></td><td class="n">${cc(r.c.net, r.p.net)}</td><td class="n">${cc(r.c.net, r.y.net)}</td>
+    <td class="n">${pu(r.c) ? f2.format(pu(r.c)) : '–'} <span class="mut">${pu(r.y) ? '(' + f2.format(pu(r.y)) + ')' : ''}</span></td><td class="n">${mb(r.a.net)}</td><td class="n">${cc(r.a.net, r.b.net)}</td>
+    <td class="n">${r.cat === 'g' && r.c.cust ? f0.format(r.c.net / r.c.cust) + ' <span class="mut">(' + (r.y.cust ? f0.format(r.y.net / r.y.cust) : '–') + ')</span>' : '<span class="mut">–</span>'}</td><td>${spark(r.sp)}</td><td>${verdict(r.tr)}</td></tr>`;
+  slides.push(`
+    <div class="kicker">รายได้แยกกลุ่มลูกค้า</div>
+    <h2>${mL(M)} เทียบเดือนก่อน / ปีก่อน และสะสมทั้งปี</h2>
+    <table><thead><tr><th>กลุ่มลูกค้า</th><th class="n">${ml(M)} (ล้าน)</th><th class="n">MoM</th><th class="n">YoY</th><th class="n">บาท/ลบ.ม. (ปีก่อน)</th><th class="n">YTD (ล้าน)</th><th class="n">YTD YoY</th><th class="n">บาท/ราย/เดือน (ปีก่อน)</th><th>แนวโน้ม ${ml(D.trendMs[0])}–${ml(M)}</th><th>3 เดือนล่าสุด vs ปีก่อน</th></tr></thead><tbody>
+      <tr class="sec"><td colspan="10">ลูกค้าทั่วไป · อัตราก้าวหน้า</td></tr>
+      ${D.rows.filter((r) => r.cat === 'g').map((r) => row(r)).join('')}
+      <tr class="sec"><td colspan="10">ลูกค้าสัญญารายใหญ่</td></tr>
+      ${D.rows.filter((r) => r.cat === 'c').map((r) => row(r, r.k === 'PWA' && D.lastPwa && D.lastPwa < M ? `<small>บิลสุดท้าย ${ml(D.lastPwa)} · พ.ค. 69 แล้ง ไม่มีส่งน้ำ</small>` : r.k === 'AOT' ? '<small>ส.ค. 69 มีใบลดหนี้/ออกบิลใหม่</small>' : '')).join('')}
+      <tr><td class="name"><b>งานขาย/บริการอื่น</b></td><td class="n"><b>${mb(D.fee.c)}</b></td><td class="n">${cc(D.fee.c, D.fee.p)}</td><td class="n">${cc(D.fee.c, D.fee.y)}</td><td class="n mut">–</td><td class="n">${mb(D.fee.a)}</td><td class="n">${cc(D.fee.a, D.fee.b)}</td><td></td><td></td><td></td></tr>
+      <tr class="tot"><td>รวม</td><td class="n">${mb(D.cur.net)}</td><td class="n">${cc(D.cur.net, D.prv.net)}</td><td class="n">${cc(D.cur.net, D.ly.net)}</td><td class="n">${f2.format(pu(D.cur))} <span class="mut">(${f2.format(pu(D.ly))})</span></td><td class="n">${mb(D.ytd.net)}</td><td class="n">${cc(D.ytd.net, D.ytdP.net)}</td><td></td><td>${spark(D.trendMs.map((m, i) => D.trend.reduce((s, t) => s + t.data[i], 0)))}</td><td></td></tr>
+    </tbody></table>
+    <p class="lede" style="font-size:12px;margin-top:6px">MoM มีผลฤดูกาล ให้ดู YoY เป็นหลัก · บาท/ลบ.ม. = รายได้ค่าน้ำ+บริการ ÷ ลบ.ม. ที่ออกบิล · บาท/ราย = รายได้กลุ่ม ÷ ผู้ใช้น้ำที่มีบิลในเดือน · “3 เดือนล่าสุด” ดีขึ้น/แย่ลงเมื่อต่างจากปีก่อนเกิน ±3%</p>
+    ${foot(2)}`);
+
+  // ---------- 3. แนวโน้ม + ฤดูกาล ----------
+  const ser = [
+    { name: 'T1', c: '#9FD0C9', d: D.trend[0].data }, { name: 'T2', c: '#3E9C96', d: D.trend[1].data }, { name: 'T3', c: '#0E6B6B', d: D.trend[2].data },
+    { name: 'ลูกค้าสัญญา (ทอท. กปภ. หอถัง)', c: '#C9A36A', d: D.trend[3].data.map((x, i) => x + D.trend[4].data[i] + D.trend[5].data[i]) },
+  ];
+  const W = 780, H = 380, pl = 46, pb = 30, pt = 14, n = D.trendMs.length;
+  const tot = D.trendMs.map((m, i) => ser.reduce((s, x) => s + x.d[i], 0));
+  const ymax = Math.ceil(Math.max(...tot) / 1e6 / 2) * 2 * 1e6;
+  const bw = (W - pl - 10) / n, y = (v) => H - pb - (v / ymax) * (H - pb - pt);
+  let svg = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="inherit">`;
+  D.trendMs.forEach((m, i) => { const mo = +m.slice(5); if (mo >= 5 && mo <= 10) svg += `<rect x="${pl + i * bw}" y="${pt}" width="${bw}" height="${H - pb - pt}" fill="#E6E1D6"/>`; });
+  for (let v = 0; v <= ymax; v += 2e6) svg += `<line x1="${pl}" x2="${W - 6}" y1="${y(v)}" y2="${y(v)}" stroke="#D9D3C7" stroke-width="${v ? 1 : 1.5}"/><text x="${pl - 8}" y="${y(v) + 4}" font-size="11" text-anchor="end" fill="#7A7F89">${v / 1e6}</text>`;
+  D.trendMs.forEach((m, i) => { let base = 0; ser.forEach((s) => { const v = s.d[i]; if (v > 0) { svg += `<rect x="${(pl + i * bw + bw * 0.16).toFixed(1)}" y="${y(base + v).toFixed(1)}" width="${(bw * 0.68).toFixed(1)}" height="${(y(base) - y(base + v)).toFixed(1)}" fill="${s.c}"><title>${ml(m)} · ${s.name}: ${mb(v)} ล้าน</title></rect>`; base += v; } });
+    if (i % 3 === 0 || i === n - 1) svg += `<text x="${pl + i * bw + bw / 2}" y="${H - 10}" font-size="11" text-anchor="middle" fill="#4B4F58">${ml(m)}</text>`; });
+  const di = D.trendMs.indexOf(D.drought.m);
+  if (di >= 0) svg += `<g><line x1="${pl + di * bw + bw / 2}" x2="${pl + di * bw + bw / 2}" y1="${y(tot[di]) - 6}" y2="${pt + 24}" stroke="#D8513A" stroke-dasharray="3 3"/><rect x="${pl + di * bw + bw / 2 - 30}" y="${pt + 4}" width="60" height="20" rx="10" fill="#D8513A"/><text x="${pl + di * bw + bw / 2}" y="${pt + 18}" font-size="11.5" text-anchor="middle" fill="#fff" font-weight="600">ภัยแล้ง</text></g>`;
+  svg += `<text x="${pl + 4}" y="${pt + 12}" font-size="11" fill="#7A7F89">ล้านบาท · แถบเทา = พ.ค.–ต.ค. (ฤดูฝน/นอกฤดูท่องเที่ยว)</text></svg>`;
+  const si = D.season.idx;
+  const seasonHtml = si.length ? `<div class="season">${si.map((x, i) => { const t = Math.max(0, Math.min(1, (x - 0.7) / 0.65)); return `<div style="background:rgba(14,107,107,${(0.1 + t * 0.75).toFixed(2)});color:${t > 0.55 ? '#fff' : '#15171C'}"><b>${TH[i]}</b>${f2.format(x)}</div>`; }).join('')}</div>` : '';
+  const gl = D.rows.filter((r) => r.tr.l3y).map((r) => `<div><span>${esc(r.name.split(' ')[0])}</span>${verdict(r.tr)}</div>`).join('');
+  slides.push(`
+    <div class="kicker">แนวโน้ม · ฤดูกาล · ภัยแล้ง</div>
+    <h2>รายได้รายเดือนแยกกลุ่ม ${ml(D.trendMs[0])} – ${ml(M)}</h2>
+    <div class="trend">
+      <div><div class="legend">${ser.map((s) => `<span><i style="background:${s.c}"></i>${s.name}</span>`).join('')}</div>${svg}</div>
+      <div class="side">
+        <h3>แนวโน้ม 3 เดือนล่าสุด เทียบปีก่อน</h3><div class="gl">${gl}</div>
+        <h3>ดัชนีฤดูกาล ปี ${+D.season.year + 543}</h3>${seasonHtml}
+        <p>รายได้ (ไม่รวม กปภ.) เดือน ${D.season.hi.join(' ')} สูงกว่าค่าเฉลี่ย ส่วน ${D.season.lo.join(' ')} ต่ำกว่า — ลูกค้า T3 ใช้น้ำมากช่วงฤดูท่องเที่ยว/แล้ง จึงต้องดู YoY ไม่ใช่ MoM</p>
+        <p><b>ภัยแล้ง ${ml(D.drought.m)}:</b> ไม่มีการส่งน้ำให้ กปภ. และ T3 ลดจาก ${mb(D.drought.t3prev)} เหลือ ${mb(D.drought.t3)} ล้านบาท — ก่อนรับลูกค้ารายใหญ่เพิ่ม ต้องวางแผนกำลังผลิตช่วงแล้งปีหน้า</p>
+      </div>
+    </div>
+    ${foot(3)}`);
+
+  // ---------- 4. Action ----------
+  slides.push(`
+    <div class="kicker">ข้อเสนอเพื่อเพิ่มรายได้</div>
+    <h2>สิ่งที่ต้องตัดสินใจ / ลงมือ เรียงตามความด่วน</h2>
+    <div class="acts">${D.actions.slice(0, 6).map((a, i) => `<div class="act p${a.p}"><div class="no">${i + 1}</div><div><h4>${esc(a.t)}</h4><div class="imp">${esc(a.imp)}</div><p>${esc(a.what)}</p><div class="own">ผู้รับผิดชอบที่เสนอ: ${esc(a.own)} · ติดตาม: ${esc(a.kpi)}</div></div></div>`).join('')}</div>
+    ${foot(4)}`);
+
+  const deck = document.getElementById('deck');
+  deck.innerHTML = slides.map((s, i) => `<section class="slide" data-i="${i}">${s}</section>`).join('');
+  const els = [...deck.children], dots = document.getElementById('dots');
+  dots.innerHTML = els.map((_, i) => `<span data-i="${i}"></span>`).join('');
+  let cur = 0;
+  function fit() { const s = Math.min(innerWidth / 1280, (innerHeight - 50) / 720); els.forEach((e) => { e.style.setProperty('--scale', `scale(${s})`); e.style.transform = `scale(${s})`; }); }
+  function go(i) { cur = Math.max(0, Math.min(els.length - 1, i)); els.forEach((e, j) => e.classList.toggle('on', j === cur)); [...dots.children].forEach((d, j) => d.classList.toggle('on', j === cur)); document.getElementById('cnt').textContent = `${cur + 1}/${els.length}`; history.replaceState(null, '', '#' + (cur + 1)); }
+  addEventListener('resize', fit);
+  addEventListener('keydown', (e) => { if (['ArrowRight', 'PageDown', ' '].includes(e.key)) go(cur + 1); if (['ArrowLeft', 'PageUp'].includes(e.key)) go(cur - 1); if (e.key === 'Home') go(0); if (e.key === 'End') go(els.length - 1); });
+  document.getElementById('prev').onclick = () => go(cur - 1); document.getElementById('next').onclick = () => go(cur + 1);
+  dots.onclick = (e) => { if (e.target.dataset.i) go(+e.target.dataset.i); };
+  document.getElementById('fs').onclick = () => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen());
+  fit(); go(Math.max(0, (+location.hash.slice(1) || 1) - 1));
+})();
+</script>
+</body>
+</html>

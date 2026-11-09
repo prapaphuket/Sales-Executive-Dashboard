@@ -8,6 +8,7 @@
     document.documentElement.setAttribute('data-theme-pref', p);
   }
   apply(pref());
+  try { if (localStorage.getItem('hea-dash-nav') === 'off') document.documentElement.classList.add('nav-off'); } catch (e) {}
   window.HEATheme = {
     get: pref,
     set: function (p) { try { localStorage.setItem(KEY, p); } catch (e) {} apply(p); document.dispatchEvent(new Event('hea-theme')); },
