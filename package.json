@@ -1,0 +1,16 @@
+{
+  "name": "hea-sales-executive-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "HEA Sales Executive Dashboard — ภาพรวมยอดขายและการจัดเก็บธุรกิจน้ำประปา",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js",
+    "snapshot": "node server/snapshot.js"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "express": "4.22.1",
+    "pg": "8.16.3"
+  }
+}

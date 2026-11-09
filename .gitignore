@@ -1,0 +1,15 @@
+node_modules/
+.env
+.env.*
+!.env.example
+# ข้อมูลลูกค้า/การเงินจริง — ไม่เก็บใน Git (สร้างใหม่ด้วย node server/snapshot.js บนเซิร์ฟเวอร์)
+data/*.json
+!data/.gitkeep
+screenshots/
+*.log
+# กุญแจถอดรหัส — เก็บใน SharePoint เท่านั้น
+*key*.txt
+keys/
+# เอกสารที่มียอดเงินรายลูกค้า — ส่งภายใน ไม่ขึ้น repo (GitHub Pages มักเป็น repo สาธารณะ)
+docs/validation_results.md
+docs/data_issues.md
