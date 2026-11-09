@@ -232,3 +232,10 @@ dialog[open] { animation: pop .25s cubic-bezier(.2,.7,.2,1); }
 }
 dialog { background: var(--card); color: var(--fg); }
 .t td.name { min-width: 240px; }
+.t tr.grp td { background: var(--subtle-bg); font-weight: 600; color: var(--heading); }
+.t tr.sub td { font-weight: 600; border-top: 1px solid var(--line-strong); }
+.t tr.total td { font-weight: 700; background: var(--tfoot-bg); border-top: 2px solid var(--line-strong); }
+.sub-h { margin: 12px 0 6px; font-size: 15px; color: var(--heading); }
+.recs { margin: 0; padding-left: 20px; display: grid; gap: 10px; }
+.recs li::marker { color: var(--accent); font-weight: 700; }
+#c-rev .tbl-wrap, #c-brg .tbl-wrap, #c-moo .tbl-wrap, #c-qst .tbl-wrap, #c-qdecl .tbl-wrap, #c-aud .tbl-wrap { max-height: none; }

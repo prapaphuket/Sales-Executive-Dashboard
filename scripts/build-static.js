@@ -25,6 +25,8 @@ const snap = JSON.parse(fs.readFileSync(path.join(dataDir, '_snapshot.json'), 'u
 const names = fs.readdirSync(path.join(ROOT, 'sql')).filter((f) => /^\d\d_.*\.sql$/.test(f)).sort().map((f) => f.replace(/^\d\d_/, '').replace(/\.sql$/, ''));
 const ds = {};
 for (const n of names) ds[n] = JSON.parse(fs.readFileSync(path.join(dataDir, n + '.json'), 'utf8'));
+// ข้อมูลเสริมจากไฟล์ (ไม่ได้มาจาก SQL)
+for (const n of ['legacy_units']) if (fs.existsSync(path.join(dataDir, n + '.json'))) { ds[n] = JSON.parse(fs.readFileSync(path.join(dataDir, n + '.json'), 'utf8')); names.push(n); }
 const bundle = { config: { mode: 'snapshot', asof_default: snap.asof, snapshot: snap, history_months: 24, datasets: names }, ds };
 
 const iv = crypto.randomBytes(12);

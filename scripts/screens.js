@@ -6,7 +6,7 @@ const { chromium } = require('playwright');
   const b = await chromium.launch();
   const p = await b.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: scale });
   const errs = []; p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); }); p.on('pageerror', (e) => errs.push(e.message));
-  const pages = ['overview', 'sales', 'customers', 'collections', 'quality'];
+  const pages = ['overview', 'revenue', 'sales', 'customers', 'usage', 'collections', 'quality'];
   for (const [i, pg] of pages.entries()) {
     await p.goto(base + '/#' + pg); await p.waitForTimeout(1500);
     if (i === 0) await p.reload(), await p.waitForTimeout(1500);

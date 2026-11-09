@@ -28,8 +28,12 @@ const DATASETS = {
   drill_top: '10_drill_top.sql',
   quality: '11_quality.sql',
   meta: '12_meta.sql',
+  revenue_groups: '13_revenue_groups.sql',
+  usage_compare: '14_usage_compare.sql',
 };
 const NO_PARAMS = new Set(['meta']);
+// ข้อมูลเสริมที่ไม่ได้อยู่ในฐานข้อมูล (ไฟล์ใน data/) — ใช้ทั้งโหมดสดและ snapshot
+const FILE_DATASETS = { legacy_units: 'legacy_units.json' };
 
 let pool = null;
 if (!SNAPSHOT) {
@@ -99,12 +103,16 @@ app.get('/api/config', (req, res) => {
     asof_default: SNAPSHOT ? snap.asof : todayBangkok(),
     snapshot: SNAPSHOT ? snap : null,
     history_months: HISTORY_MONTHS,
-    datasets: Object.keys(DATASETS),
+    datasets: Object.keys(DATASETS).concat(Object.keys(FILE_DATASETS)),
   });
 });
 
 app.get('/api/ds/:name', async (req, res) => {
   const name = req.params.name;
+  if (FILE_DATASETS[name]) {
+    try { return res.json({ data: JSON.parse(fs.readFileSync(path.join(DATA_DIR, FILE_DATASETS[name]), 'utf8')), mode: SNAPSHOT ? 'snapshot' : 'live' }); }
+    catch (e) { return res.json({ data: null }); }
+  }
   if (!DATASETS[name]) return res.status(404).json({ error: 'ไม่มีชุดข้อมูลนี้' });
   try {
     if (SNAPSHOT) {
