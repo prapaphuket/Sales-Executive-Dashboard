@@ -370,3 +370,14 @@ dialog { background: var(--card); color: var(--fg); }
 .grp-t thead tr.gh th:first-child { text-align: left; vertical-align: bottom; }
 .grp-t thead tr:nth-child(2) th { position: static; }
 .grp-t .gs { border-left: 2px solid var(--line-strong); }
+.snap-t-tbl tr.sub td { font-weight: 600; border-top: 1px solid var(--line-strong); }
+.snap-t-tbl tr.water td { font-weight: 700; color: var(--heading); background: color-mix(in srgb, var(--accent) 9%, var(--card)); border-top: 2px solid var(--accent); border-bottom: 2px solid var(--accent); }
+@media print { .snap-t-tbl tr.water td { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+/* เส้นแบ่งคอลัมน์: เส้นบางทุกคอลัมน์ + เส้นหนาเมื่อขึ้นกลุ่มใหม่ */
+table.vlines td + td, table.vlines th + th { border-left: 1px solid var(--line); }
+table.vlines .gs { border-left: 2px solid var(--line-strong) !important; }
+table.vlines tr.grp td { border-left: 0; }
+.snap-t-tbl.vlines tbody td:nth-child(2), .snap-t-tbl.vlines tbody td:nth-child(6), .snap-t-tbl.vlines tbody td:nth-child(9), .snap-t-tbl.vlines tbody td:nth-child(10),
+.snap-t-tbl.vlines thead tr:not(.gh) th:nth-child(2), .snap-t-tbl.vlines thead tr:not(.gh) th:nth-child(6), .snap-t-tbl.vlines thead tr:not(.gh) th:nth-child(9), .snap-t-tbl.vlines thead tr:not(.gh) th:nth-child(10) { border-left: 2px solid var(--line-strong); }
+.snap-t-tbl tr.gh th { text-align: center; padding: 3px 6px; font-size: 12px; background: color-mix(in srgb, var(--accent) 12%, var(--th-bg)); border-bottom: 1px solid var(--line-strong); }
+@media print { .snap-t-tbl tr.gh th { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }

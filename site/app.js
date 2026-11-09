@@ -762,11 +762,16 @@
     const fc = forecastYear();
     const mtd = S.partialMonth ? all([S.partialMonth]) : null;
     const trendMs = monthsBetween(Yp + '-01', M);
-    const t3 = (k) => { const g = SG.find((x) => x.k === k); return { l3: sumM(monthsBetween(addM(M, -2), M), g.tys).net, l3y: sumM(monthsBetween(addM(My, -2), My), g.tys).net }; };
-    const rows = SG.map((g) => {
-      const c = snapMonth(M, g.tys), p = snapMonth(Mp, g.tys), y = snapMonth(My, g.tys), a = sumM(ytdMs, g.tys), b = sumM(ytdPs, g.tys), tr = t3(g.k);
+    const t3 = (tys) => ({ l3: sumM(monthsBetween(addM(M, -2), M), tys).net, l3y: sumM(monthsBetween(addM(My, -2), My), tys).net });
+    const mkRow = (g) => {
+      const c = snapMonth(M, g.tys), p = snapMonth(Mp, g.tys), y = snapMonth(My, g.tys), a = sumM(ytdMs, g.tys), b = sumM(ytdPs, g.tys), tr = t3(g.tys);
       return { g, c, p, y, a, b, tr, sp: trendMs.map((m) => snapMonth(m, g.tys).net) };
-    });
+    };
+    const rows = SG.map(mkRow);
+    const tysOf = (cat) => SG.filter((g) => !cat || g.cat === cat).flatMap((g) => g.tys);
+    const subG = mkRow({ k: 'SUBG', name: 'รวมลูกค้าทั่วไป', tys: tysOf('g'), cat: 'g', cls: 'sub' });
+    const subC = mkRow({ k: 'SUBC', name: 'รวมลูกค้าสัญญา', tys: tysOf('c'), cat: 'c', cls: 'sub' });
+    const subW = mkRow({ k: 'SUBW', name: 'รวมขายน้ำ (ทั่วไป+สัญญา)', tys: tysOf(null), cat: 'w', cls: 'water' });
     const feeC = all([M]).fee, feeP = all([Mp]).fee, feeY = all([My]).fee, feeA = ytd.fee, feeB = ytdP.fee;
     const lastPwa = S.sales.filter((r) => r.ty === 'T2.2' && r.net > 0 && (r.src === 'W' || r.src === 'L')).map((r) => r.m).sort().pop();
     // ฤดูกาล: ดัชนีรายเดือนจากปีก่อน (ไม่รวม กปภ.) = เดือน ÷ ค่าเฉลี่ยทั้งปี
@@ -780,6 +785,11 @@
     const A = actionPlan().slice(0, 4);
     const kp = (label, v, unit, cmp, sub, cls = '') => `<div class="sk ${cls}"><div class="sk-l">${label}</div><div class="sk-v">${v}<small>${unit}</small></div>${cmp ? `<div class="sk-c">${cmp}</div>` : ''}${sub ? `<div class="sk-s">${sub}</div>` : ''}</div>`;
     const mm = (v) => nf2.format(v / 1e6);
+    const snapRow = (r) => `            <tr class="${r.g.cls || ''}"><td>${esc(r.g.name)}${r.g.k === 'PWA' && lastPwa && lastPwa < M ? `<br><small class="neg">บิลสุดท้าย ${mLabel(lastPwa)}</small>` : ''}</td><td class="n"><b>${mm(r.c.net)}</b></td><td class="n">${cmpCell(r.c.net, r.p.net)}</td><td class="n">${cmpCell(r.c.net, r.y.net)}</td>
+            <td class="n">${r.c.units ? nf2.format(r.c.pnet / r.c.units) : '–'} <small class="muted">(${r.y.units ? nf2.format(r.y.pnet / r.y.units) : '–'})</small></td>
+            <td class="n">${mm(r.a.net)}</td><td class="n">${cmpCell(r.a.net, r.b.net)}</td><td class="n">${pct(ytd.net ? r.a.net / ytd.net : null)}</td>
+            <td class="n">${r.g.cat === 'g' && r.c.cust ? int(r.c.net / r.c.cust) + ` <small class="muted">(${r.y.cust ? int(r.y.net / r.y.cust) : '–'})</small>` : '–'}</td>
+            <td class="sp-cell">${spark(r.sp)}</td><td>${verdict(r.tr.l3, r.tr.l3y)}</td></tr>`;
     el.innerHTML = `
       <div class="snap-tools"><button type="button" class="btn" id="snap-print">พิมพ์ / บันทึก PDF (2 หน้า)</button><span class="small muted">ใช้ตัวกรองสาขา/ประเภทด้านบนได้ · ช่วงเดือนไม่มีผล (ใช้เดือนเต็มล่าสุด)</span></div>
       <div class="snap">
@@ -789,21 +799,19 @@
           <div class="snap-asof">ข้อมูล ณ ${dLabel(S.asof)}<br>${S.cfg.mode === 'live' ? 'LIVE' : 'SNAPSHOT'} · ดึง ${S.fetched ? dLabel(S.fetched.slice(0, 10)) : '–'}</div></header>
         <div class="sk-row">
           ${kp(`รายได้ ${mLabel(M)}`, mm(cur.net), ' ล้านบาท', `MoM ${cmpCell(cur.net, prv.net)}<br>YoY ${cmpCell(cur.net, ly.net)}`, '', 'main')}
-          ${kp('ไม่รวม กปภ.', mm(xc.net), ' ล้านบาท', `MoM ${cmpCell(xc.net, xp.net)}<br>YoY ${cmpCell(xc.net, xy.net)}`, 'ฐานธุรกิจต่อเนื่อง')}
+          ${kp(`ลูกค้าทั่วไป ${mLabel(M)}`, mm(subG.c.net), ' ล้านบาท', `MoM ${cmpCell(subG.c.net, subG.p.net)}<br>YoY ${cmpCell(subG.c.net, subG.y.net)}`, `T1–T3 อัตราก้าวหน้า · ${pct(cur.net ? subG.c.net / cur.net : null)} ของรายได้`)}
           ${kp(`ปริมาณน้ำ ${mLabel(M)}`, int(cur.units), ' ลบ.ม.', `MoM ${cmpCell(cur.units, prv.units)}<br>YoY ${cmpCell(cur.units, ly.units)}`)}
           ${kp('ราคาเฉลี่ยต่อหน่วย', nf2.format(pu(cur) || 0), ' บาท/ลบ.ม.', `MoM ${cmpCell(pu(cur), pu(prv))}<br>YoY ${cmpCell(pu(cur), pu(ly))}`, 'เปลี่ยนตามสัดส่วนลูกค้า (mix)')}
           ${kp(`YTD ม.ค.–${TH_M[+M.slice(5) - 1]}`, mm(ytd.net), ' ล้านบาท', `YoY ${cmpCell(ytd.net, ytdP.net)}<br>ไม่รวม กปภ. ${cmpCell(xytd.net, xytdP.net)}`)}
           ${kp(`ประมาณการทั้งปี ${+Y + 543}`, mm(fc.fc), ' ล้านบาท', fc.prev ? `เทียบปีก่อน ${cmpCell(fc.fc, fc.prev)}` : '', `MTD ${S.partialMonth ? mLabel(S.partialMonth) + ' ' + mm(mtd.net) + ' ล้าน (ถึง ' + dLabel(S.asof) + ' · บิลออกปลายเดือน)' : '–'}`)}
         </div>
-        <table class="snap-t-tbl">
-          <thead><tr><th>กลุ่มลูกค้า</th><th class="n">${mLabel(M)}<br><small>ล้านบาท</small></th><th class="n">MoM</th><th class="n">YoY</th><th class="n">บาท/ลบ.ม.<br><small>${mLabel(M)} (ปีก่อน)</small></th><th class="n">YTD ${+Y + 543}<br><small>ล้านบาท</small></th><th class="n">YTD YoY</th><th class="n">สัดส่วน<br><small>YTD</small></th><th class="n">รายได้/ราย<br><small>/เดือน (บาท)</small></th><th>แนวโน้ม ม.ค. ${(+Yp + 543) % 100} – ${mLabel(M)}</th><th>3 เดือนล่าสุด<br><small>เทียบปีก่อน</small></th></tr></thead>
+        <table class="snap-t-tbl vlines">
+          <thead><tr class="gh"><th></th><th class="gs" colspan="4">เดือน ${mLabel(M)}</th><th class="gs" colspan="3">สะสม ม.ค.–${mLabel(M)}</th><th class="gs">ต่อราย</th><th class="gs" colspan="2">แนวโน้ม</th></tr><tr><th>กลุ่มลูกค้า</th><th class="n">${mLabel(M)}<br><small>ล้านบาท</small></th><th class="n">MoM</th><th class="n">YoY</th><th class="n">บาท/ลบ.ม.<br><small>${mLabel(M)} (ปีก่อน)</small></th><th class="n">YTD ${+Y + 543}<br><small>ล้านบาท</small></th><th class="n">YTD YoY</th><th class="n">สัดส่วน<br><small>YTD</small></th><th class="n">รายได้/ราย<br><small>/เดือน (บาท)</small></th><th>แนวโน้ม ม.ค. ${(+Yp + 543) % 100} – ${mLabel(M)}</th><th>3 เดือนล่าสุด<br><small>เทียบปีก่อน</small></th></tr></thead>
           <tbody>
-          ${rows.map((r, i) => `${i === 3 ? '<tr class="grp"><td colspan="11">ลูกค้าสัญญารายใหญ่</td></tr>' : i === 0 ? '<tr class="grp"><td colspan="11">ลูกค้าทั่วไป (อัตราก้าวหน้า)</td></tr>' : ''}
-            <tr><td>${esc(r.g.name)}${r.g.k === 'PWA' && lastPwa && lastPwa < M ? `<br><small class="neg">บิลสุดท้าย ${mLabel(lastPwa)}</small>` : ''}</td><td class="n"><b>${mm(r.c.net)}</b></td><td class="n">${cmpCell(r.c.net, r.p.net)}</td><td class="n">${cmpCell(r.c.net, r.y.net)}</td>
-            <td class="n">${r.c.units ? nf2.format(r.c.pnet / r.c.units) : '–'} <small class="muted">(${r.y.units ? nf2.format(r.y.pnet / r.y.units) : '–'})</small></td>
-            <td class="n">${mm(r.a.net)}</td><td class="n">${cmpCell(r.a.net, r.b.net)}</td><td class="n">${pct(ytd.net ? r.a.net / ytd.net : null)}</td>
-            <td class="n">${r.g.cat === 'g' && r.c.cust ? int(r.c.net / r.c.cust) + ` <small class="muted">(${r.y.cust ? int(r.y.net / r.y.cust) : '–'})</small>` : '–'}</td>
-            <td class="sp-cell">${spark(r.sp)}</td><td>${verdict(r.tr.l3, r.tr.l3y)}</td></tr>`).join('')}
+          <tr class="grp"><td colspan="11">ลูกค้าทั่วไป (อัตราก้าวหน้า)</td></tr>
+          ${rows.filter((r) => r.g.cat === 'g').map(snapRow).join('')}${snapRow(subG)}
+          <tr class="grp"><td colspan="11">ลูกค้าสัญญารายใหญ่</td></tr>
+          ${rows.filter((r) => r.g.cat === 'c').map(snapRow).join('')}${snapRow(subC)}${snapRow(subW)}
             <tr><td>งานขาย/บริการอื่น</td><td class="n"><b>${mm(feeC)}</b></td><td class="n">${cmpCell(feeC, feeP)}</td><td class="n">${cmpCell(feeC, feeY)}</td><td class="n">–</td><td class="n">${mm(feeA)}</td><td class="n">${cmpCell(feeA, feeB)}</td><td class="n">${pct(ytd.net ? feeA / ytd.net : null)}</td><td class="n">–</td><td></td><td></td></tr>
             <tr class="total"><td>รวมรายได้</td><td class="n">${mm(cur.net)}</td><td class="n">${cmpCell(cur.net, prv.net)}</td><td class="n">${cmpCell(cur.net, ly.net)}</td><td class="n">${nf2.format(pu(cur) || 0)} <small class="muted">(${ly.units ? nf2.format(pu(ly)) : '–'})</small></td><td class="n">${mm(ytd.net)}</td><td class="n">${cmpCell(ytd.net, ytdP.net)}</td><td class="n">100%</td><td></td><td class="sp-cell">${spark(trendMs.map((m) => all([m]).net))}</td><td>${verdict(sumM(monthsBetween(addM(M, -2), M), null).net, sumM(monthsBetween(addM(My, -2), My), null).net)}</td></tr>
           </tbody></table>
@@ -992,7 +1000,7 @@
     rows.filter((r) => r.g.cat === 'o').forEach((r) => trs.push(tRow(r.g.name, r.a, r.b)));
     trs.push(tRow('งานขาย/บริการอื่น (ค่าติดตั้ง ฯลฯ)', { net: A('fee', Y1).fee }, { net: A('fee', Y0).fee }));
     trs.push(tRow('รวมรายได้ทั้งสิ้น', { net: t1 }, { net: t0 }, 'total'));
-    const tbl = `<div class="tbl-wrap"><table class="t grp-t" data-csvable="1"><thead>
+    const tbl = `<div class="tbl-wrap"><table class="t grp-t vlines" data-csvable="1"><thead>
       <tr class="gh"><th rowspan="2">กลุ่มลูกค้า</th><th class="c-g gs" colspan="4">💰 รายได้ (บาท)</th><th class="c-g gs" colspan="3">💧 ปริมาณน้ำ และราคาต่อหน่วย</th><th class="c-g gs" colspan="3">👥 ลูกค้า</th></tr>
       <tr><th class="n gs">${Y0 + 543}</th><th class="n">${Y1 + 543}</th><th class="n">YoY</th><th class="n">สัดส่วน ${Y1 + 543}</th>
       <th class="n gs">ลบ.ม. ${Y1 + 543}</th><th class="n">บาท/ลบ.ม. ${Y0 + 543}</th><th class="n">บาท/ลบ.ม. ${Y1 + 543}</th><th class="n gs">จำนวน (ราย)</th><th class="n">รายได้/ราย/เดือน ${Y0 + 543}</th><th class="n">รายได้/ราย/เดือน ${Y1 + 543}</th></tr></thead><tbody>
@@ -1106,7 +1114,7 @@
     const subR = (cat, label) => { const rs = mr.filter((r) => r.g.cat === cat); const f = (y) => ({ net: sum(rs, (r) => (y === Y1 ? r.a : r.b).net), units: sum(rs, (r) => (y === Y1 ? r.a : r.b).units), cust: sum(rs, (r) => (y === Y1 ? r.a : r.b).cust) }); return { g: { name: label }, a: f(Y1), b: f(Y0), sub: 1 }; };
     const mixRows = [{ head: 'ลูกค้าทั่วไป' }, ...mr.filter((r) => r.g.cat === 'g'), subR('g', 'รวมลูกค้าทั่วไป'), { head: 'ลูกค้าสัญญารายใหญ่' }, ...mr.filter((r) => r.g.cat === 'c'), subR('c', 'รวมลูกค้าสัญญา')];
     const yy = (y) => String(y + 543).slice(2);
-    $('t-mix').innerHTML = `<div class="tbl-wrap" style="max-height:none"><table class="t mix-t grp-t" data-csvable="1"><thead>
+    $('t-mix').innerHTML = `<div class="tbl-wrap" style="max-height:none"><table class="t mix-t grp-t vlines" data-csvable="1"><thead>
       <tr class="gh"><th rowspan="2">กลุ่ม</th><th class="c-g gs" colspan="2">💰 สัดส่วนรายได้</th><th class="c-g gs" colspan="2">💧 สัดส่วนปริมาณน้ำ</th><th class="c-g gs" colspan="2">👥 สัดส่วนลูกค้า</th></tr>
       <tr><th class="n gs">${Y0 + 543}</th><th class="n">${Y1 + 543}</th><th class="n gs">${Y0 + 543}</th><th class="n">${Y1 + 543}</th><th class="n gs">${Y0 + 543}</th><th class="n">${Y1 + 543}</th></tr></thead><tbody>
       ${mixRows.map((r) => (r.head ? `<tr class="grp"><td colspan="7">${r.head}</td></tr>` : `<tr class="${r.sub ? 'sub' : ''}"><td class="nw">${r.g.k ? `<span class="dot" style="background:${MC[r.g.k]}"></span>` : ''}${esc(short(r.g.name))}</td>${cell(r, 'net')}${cell(r, 'units')}${cell(r, 'cust')}</tr>`)).join('')}

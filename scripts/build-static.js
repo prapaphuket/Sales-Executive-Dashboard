@@ -61,5 +61,8 @@ rep('<div class="app">', `<div class="lock" id="lock">
 <div class="app" id="dash-root" hidden>`);
 rep('<div class="side-foot">', '<div class="userbar" id="userbar" hidden><span id="who"></span><button type="button" id="logout">ออกจากระบบ</button></div>\n    <div class="side-foot">');
 rep('<script src="app.js"></script>', '<script>window.HEA_STATIC = 1;</script>\n<script src="vendor/msal-browser.min.js"></script>\n<script src="auth-config.js"></script>\n<script src="data.enc.js"></script>\n<script src="app.js"></script>\n<script src="gate.js"></script>');
+// กัน browser ใช้ไฟล์เก่าจาก cache หลังอัปเดต: ต่อท้าย ?v=<เวลา build> ให้ไฟล์ js/css ของเรา
+const ver = Date.now().toString(36);
+html = html.replace(/(src|href)="((?!https?:|\/\/)[\w./-]+\.(?:js|css))"/g, (m, attr, f) => `${attr}="${f}?v=${ver}"`);
 fs.writeFileSync(path.join(out, 'index.html'), html);
 console.log('สร้างเว็บที่', out, '· ข้อมูล ณ', snap.asof, '·', (enc.length / 1024).toFixed(0), 'KB (เข้ารหัส)');
