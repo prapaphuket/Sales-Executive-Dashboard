@@ -1085,13 +1085,16 @@
     // ---- สัดส่วนรายได้ / ปริมาณน้ำ / ลูกค้า ----
     const mr = rows.filter((r) => r.g.cat !== 'o');
     const short = (n) => n.replace(' อัตราก้าวหน้า', '').replace(' (ท่าอากาศยานภูเก็ต)', '').replace(' (ขายส่ง)', '').replace(' (หอถังสูง)', '').replace(' ตำรวจภูธรภาค 8', ' ตำรวจ');
-    const MC = { 'T1': C.sky, 'T2': C.oliveChart, 'T2.1': '#9BB87A', 'T3': C.navy, 'T3.1': '#E8833A', 'T2.2': C.neutral, 'T2.3': '#B07CC6' };
+    const mixHex = (a, b, t) => { const h = (x) => [1, 3, 5].map((i) => parseInt(x.slice(i, i + 2), 16)); const A = h(a), B = h(b); return '#' + A.map((v, i) => Math.round(v + (B[i] - v) * t).toString(16).padStart(2, '0')).join(''); };
+    const T21C = /^#[0-9a-f]{6}$/i.test(C.oliveChart) && /^#[0-9a-f]{6}$/i.test(C.surface || '') ? mixHex(C.oliveChart, C.surface, 0.55) : '#C9D9B6';
+    const txtOn = (hex) => { if (!/^#[0-9a-f]{6}$/i.test(hex)) return '#fff'; const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255); return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.55 ? '#1C1C1E' : '#fff'; };
+    const MC = { 'T1': C.sky, 'T2': C.oliveChart, 'T2.1': T21C, 'T3': C.navy, 'T3.1': '#E8833A', 'T2.2': C.neutral, 'T2.3': '#B07CC6' };
     const tot3 = (y) => ({ net: sum(mr, (r) => (y === Y1 ? r.a : r.b).net), units: sum(mr, (r) => (y === Y1 ? r.a : r.b).units), cust: sum(mr, (r) => (y === Y1 ? r.a : r.b).cust) });
     const T1x = tot3(Y1), T0x = tot3(Y0);
     const sh = (v, t) => (t ? v / t : null);
     const MK = [['net', 'รายได้'], ['units', 'ปริมาณน้ำ'], ['cust', 'จำนวนลูกค้า']];
-    const ms = mr.map((r) => ({ name: short(r.g.name), type: 'bar', stack: 'm', barWidth: 34, itemStyle: { color: MC[r.g.k] || C.neutral },
-      label: { show: true, formatter: (p) => (p.value >= 6 ? nf0.format(p.value) + '%' : ''), color: '#fff', fontFamily: 'Prompt', fontSize: 11 },
+    const ms = mr.map((r) => ({ name: short(r.g.name), type: 'bar', stack: 'm', barWidth: 34, itemStyle: { color: MC[r.g.k] || C.neutral, borderColor: C.surface || '#fff', borderWidth: 1 },
+      label: { show: true, formatter: (p) => (p.value >= 6 ? nf0.format(p.value) + '%' : ''), color: txtOn(MC[r.g.k] || C.neutral), fontFamily: 'Prompt', fontSize: 11, fontWeight: 600 },
       data: MK.map(([k]) => (T1x[k] ? Math.round(r.a[k] / T1x[k] * 1000) / 10 : 0)) }));
     chart($('ch-mix'), { grid: { left: 8, right: 16, top: 56, bottom: 8, containLabel: true }, xAxis: { type: 'value', max: 100, axisLabel: { ...baseText, formatter: '{value}%' }, splitLine: { lineStyle: { color: C.grid } } },
       yAxis: { type: 'category', inverse: true, data: MK.map((x) => x[1]), axisTick: { show: false }, axisLine: { lineStyle: { color: C.line } }, axisLabel: { ...baseText, fontWeight: 600 } },
