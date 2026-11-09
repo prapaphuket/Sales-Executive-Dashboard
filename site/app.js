@@ -204,8 +204,27 @@
   function disposeCharts() { S.charts.forEach((c) => c.dispose()); S.charts = []; }
   const baseText = { fontFamily: 'Prompt', color: C.text2, fontSize: 12 };
   const REDUCED = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // ลูกเล่นจาก WMS dashboard เดิม: เส้นกราฟค่อย ๆ ลากเส้น + จุดล่าสุดกระพริบเป็นคลื่น
+  function withEffects(opt) {
+    const lines = (opt.series || []).filter((x) => x.type === 'line');
+    lines.forEach((x) => { x.animationDuration = REDUCED ? 0 : 2400; x.animationEasing = 'cubicInOut'; });
+    if (!REDUCED && opt.xAxis && opt.xAxis.data) {
+      const cats = opt.xAxis.data;
+      lines.filter((x) => !x.noPulse).forEach((x) => {
+        let i = x.data.length - 1; while (i >= 0 && x.data[i] == null) i--;
+        if (i < 0 || i !== cats.length - 1) return;   // กระพริบเฉพาะเส้นที่มีค่าเดือนล่าสุด
+        opt.series.push({ type: 'effectScatter', name: '', data: [[cats[i], x.data[i]]], symbolSize: 9, z: 5, tooltip: { show: false }, legendHoverLink: false, silent: true,
+          itemStyle: { color: (x.itemStyle && x.itemStyle.color) || C.navy }, rippleEffect: { scale: 3.2, brushType: 'stroke', period: 2.4 }, showEffectOn: 'render', animationDelay: 2200 });
+      });
+    }
+    if (opt.legend !== undefined && opt.legend.show === false) return opt;
+    opt.legend = Object.assign({ top: 0, left: 0, textStyle: { ...baseText, color: C.body, fontSize: 12.5 }, itemWidth: 12, itemHeight: 12, icon: 'roundRect' }, opt.legend || {},
+      { data: (opt.series || []).filter((x) => x.type !== 'effectScatter').map((x) => x.name) });
+    return opt;
+  }
   function chart(el, opt) {
     const c = echarts.init(el, null, { renderer: 'svg' });
+    opt = withEffects(opt);
     c.setOption(Object.assign({
       textStyle: baseText, animationDuration: REDUCED ? 0 : 900, animationEasing: 'cubicOut', animationDurationUpdate: 500, animationDelay: (i) => (REDUCED ? 0 : i * 25),
       grid: { left: 8, right: 16, top: 36, bottom: 8, containLabel: true },
@@ -220,7 +239,7 @@
   const ttMoney = (unit) => (ps) => {
     const arr = Array.isArray(ps) ? ps : [ps];
     let tot = 0;
-    const lines = arr.filter((p) => p.value != null).map((p) => { tot += Number(p.value) || 0; return `${p.marker}${esc(p.seriesName)} <b style="float:right;margin-left:16px">${unit === 'u' ? int(p.value) : baht(p.value)}</b>`; });
+    const lines = arr.filter((p) => p.value != null && p.seriesType !== 'effectScatter').map((p) => { tot += Number(p.value) || 0; return `${p.marker}${esc(p.seriesName)} <b style="float:right;margin-left:16px">${unit === 'u' ? int(p.value) : baht(p.value)}</b>`; });
     return `<div style="min-width:220px"><b>${esc(arr[0].axisValueLabel || arr[0].name)}</b><br>${lines.join('<br>')}${arr.length > 1 && !arr.some((p) => p.seriesType === 'line') ? `<br><span style="border-top:1px solid #ddd;display:block;margin-top:4px">รวม <b style="float:right">${unit === 'u' ? int(tot) : baht(tot)}</b></span>` : ''}</div>`;
   };
   const barStyle = (color) => ({ color, borderColor: C.surface, borderWidth: 1 });
@@ -308,7 +327,9 @@
     if (opts.enter && !REDUCED) { el.querySelectorAll('.card, .sec-title').forEach((c, i) => c.style.setProperty('--i', Math.min(i, 14))); void el.offsetWidth; el.classList.add('enter'); }
     if (!opts.still) countUp(el);
   }
+  let kpiRun = 0;
   function countUp(root) {
+    const run = ++kpiRun;
     if (REDUCED) return;
     root.querySelectorAll('.kpi .value').forEach((v) => {
       const node = v.firstChild;
@@ -317,8 +338,14 @@
       if (!m) return;
       const target = Number(m[2].replace(/,/g, '') + (m[3] || '')) * (m[1] ? -1 : 1), dec = m[4] ? m[4].length : 0, pctSign = m[5];
       const fmt = new Intl.NumberFormat('th-TH', { minimumFractionDigits: dec, maximumFractionDigits: dec });
-      const t0 = performance.now(), dur = 900;
-      const step = (t) => { const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3); node.nodeValue = fmt.format(target * e) + pctSign; if (k < 1) requestAnimationFrame(step); else node.nodeValue = txt; };
+      const t0 = performance.now(), dur = 1800;   // ตัวเลขวิ่ง 1.8 วินาที แบบ ease-out เหมือน WMS dashboard เดิม
+      node.nodeValue = fmt.format(0) + pctSign;
+      const step = (t) => {
+        if (run !== kpiRun) { node.nodeValue = txt; return; }   // วาดใหม่ระหว่างวิ่ง: จบที่ค่าจริงทันที
+        const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+        node.nodeValue = k < 1 ? fmt.format(target * e) + pctSign : txt;   // จบที่ค่าจริงเสมอ
+        if (k < 1) requestAnimationFrame(step);
+      };
       requestAnimationFrame(step);
     });
   }
@@ -378,7 +405,7 @@
     const months = monthsBetween(from, to);
     const brs = chartBranches((b) => S.sales.some((r) => r.br === b && inR(r.m, from, to)));
     const series = brs.map((b) => ({ name: b, type: 'bar', stack: 's', barMaxWidth: 34, itemStyle: barStyle(brColor(b)), data: months.map((m) => round2(sum(S.sales.filter((r) => r.m === m && brG(r.br) === b && okBr(r.br) && okTy(r.ty)), (r) => r.net))) }));
-    const prevLine = { name: 'ปีก่อน (เดือนเดียวกัน)', type: 'line', symbolSize: 7, lineStyle: { width: 2, type: 'dashed', color: C.text2 }, itemStyle: { color: C.text2 },
+    const prevLine = { name: 'ปีก่อน (เดือนเดียวกัน)', type: 'line', noPulse: true, symbolSize: 7, lineStyle: { width: 2, type: 'dashed', color: C.text2 }, itemStyle: { color: C.text2 },
       data: months.map((m) => { const pm = addM(m, -12); return pm >= S.months[0] ? round2(sum(S.sales.filter((r) => r.m === pm && okBr(r.br) && okTy(r.ty)), (r) => r.net)) : null; }) };
     const all = series.concat([prevLine]);
     chart($('ch-trend'), { xAxis: catAxis(months.map((m) => mLabel(m) + (S.pwaMissing.includes(m) ? ' ⚠' : ''))), yAxis: valAxis(), series: all, tooltip: { ...chartTT(), formatter: ttMoney() } });
