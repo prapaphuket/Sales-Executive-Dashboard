@@ -5,6 +5,6 @@ window.HEA_AUTH = {
   groupId: '1512fedb-c62b-43b4-889c-3be09db226dc',      // กลุ่มที่ดูได้ (ตอนนี้ใช้ wms_dashboard_viewers) — เปลี่ยนได้
   groupName: 'wms_dashboard_viewers',
   // ลิงก์แชร์ไฟล์กุญแจใน SharePoint/OneDrive (แชร์ให้เฉพาะกลุ่มที่ดูได้) — ใส่หลังอัปโหลดไฟล์กุญแจ
-  keyShareUrl: '__ใส่ลิงก์แชร์ไฟล์กุญแจ__',
+  keyShareUrl: 'https://sevenutilitiesandpower.sharepoint.com/:t:/g/IQA6s7e8fk24SLF_lNzKQtsCAXIvVD47_S2lknUPCqogHtY',
   // redirectUri: 'https://<owner>.github.io/<repo>/',   // ไม่ใส่ = ใช้ URL ของหน้าเว็บเอง
 };
