@@ -29,6 +29,7 @@ const DATASETS = {
   quality: '11_quality.sql',
   meta: '12_meta.sql',
   revenue_groups: '13_revenue_groups.sql',
+  pipeline: '15_pipeline.sql',
   usage_compare: '14_usage_compare.sql',
 };
 const NO_PARAMS = new Set(['meta']);
