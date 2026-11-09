@@ -24,6 +24,7 @@
   </div>
 </div>
 <div class="app" id="dash-root" hidden>
+  <div class="nav-edge" id="nav-edge" aria-hidden="true"></div>
   <aside class="side" aria-label="เมนูหลัก">
     <div class="logo-zone">
       <img class="logo" src="assets/hea-logo-white@2x.png" width="132" height="76"
@@ -31,13 +32,11 @@
     </div>
     <nav class="nav" id="nav">
       <a href="#snapshot" data-page="snapshot">Executive Snapshot</a>
-      <a href="#overview" data-page="overview">ภาพรวมผู้บริหาร</a>
       <a href="#revenue" data-page="revenue">รายได้ตามกลุ่มลูกค้า</a>
+      <a href="#usage" data-page="usage">การใช้น้ำเทียบปีก่อน</a>
       <a href="#sales" data-page="sales">ยอดขายและการใช้น้ำ</a>
       <a href="#customers" data-page="customers">ลูกค้าและการเติบโต</a>
-      <a href="#usage" data-page="usage">การใช้น้ำเทียบปีก่อน</a>
       <a href="#collections" data-page="collections">การจัดเก็บและลูกหนี้</a>
-      <a href="#quality" data-page="quality">คุณภาพข้อมูลและนิยาม</a>
     </nav>
     <div class="userbar" id="userbar" hidden><span id="who"></span><button type="button" id="logout">ออกจากระบบ</button></div>
     <div class="side-foot">
@@ -48,7 +47,7 @@
 
   <main class="main">
     <header class="top">
-      <button type="button" class="nav-toggle" id="nav-toggle" aria-label="ซ่อน/แสดงเมนู" aria-expanded="true" title="ซ่อน/แสดงเมนู">☰</button>
+      <button type="button" class="nav-toggle" id="nav-toggle" aria-label="ปักหมุดเมนู / ซ่อนอัตโนมัติ" aria-expanded="false" title="คลิกเพื่อปักหมุดเมนูค้างไว้ · คลิกอีกครั้งเพื่อให้ซ่อนอัตโนมัติ">☰</button>
       <div class="titles">
         <h1>HEA Sales Executive Dashboard</h1>
         <p class="subtitle">ภาพรวมยอดขายและการจัดเก็บธุรกิจน้ำประปา</p>

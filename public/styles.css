@@ -328,3 +328,45 @@ dialog { background: var(--card); color: var(--fg); }
 :root.nav-off .side { visibility: hidden; }
 @media (max-width: 1100px) { .app, :root.nav-off .app { grid-template-columns: 1fr; } :root.nav-off .side { display: none; } .logo-zone { padding: 24px 32px; } .logo { width: 72px; } }
 @media print { .nav-toggle { display: none; } }
+
+/* ---------- เมนูซ้ายซ่อนอัตโนมัติ (จอกว้าง) ---------- */
+.nav-edge { display: none; }
+.nav-toggle.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+@media (min-width: 1101px) {
+  :root:not(.nav-pin) .app { grid-template-columns: minmax(0, 1fr); }
+  :root:not(.nav-pin) .side { position: fixed; left: 0; top: 0; bottom: 0; width: 216px; z-index: 60; visibility: visible;
+    transform: translateX(-100%); transition: transform .24s ease, box-shadow .24s ease; overflow-y: auto; }
+  :root.nav-peek:not(.nav-pin) .side { transform: none; box-shadow: 8px 0 32px rgba(0,0,0,.28); }
+  :root:not(.nav-pin) .nav-edge { display: block; position: fixed; left: 0; top: 0; bottom: 0; width: 10px; z-index: 59;
+    background: linear-gradient(90deg, var(--side-bg) 0 3px, transparent 3px); opacity: .55; cursor: e-resize; }
+  :root:not(.nav-pin) .nav-edge:hover { opacity: 1; }
+}
+@media (min-width: 1101px) and (prefers-reduced-motion: reduce) { :root:not(.nav-pin) .side { transition: none; } }
+@media print { .nav-edge { display: none !important; } }
+
+/* ปุ่มสลับตัวชี้วัดในการ์ด */
+.seg2 { display: inline-flex; background: var(--card); border: 1px solid var(--line-strong); border-radius: 999px; padding: 3px; gap: 2px; margin: 4px 0 8px; }
+.seg2 button { border: 0; background: transparent; color: var(--text-2); padding: 5px 14px; border-radius: 999px; cursor: pointer; font-size: 13px; font-weight: 500; font-family: inherit; }
+.seg2 button[aria-pressed="true"] { background: var(--accent); color: var(--card); }
+.seg2 button:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+@media print { .seg2 { display: none; } }
+
+.yoy-chips { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; margin: 0 0 10px; font-size: 13px; }
+.yoy-chips .yc-l { color: var(--text-2); margin-right: 2px; }
+.yoy-chips .yc { padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line-strong); white-space: nowrap; }
+.yoy-chips .yc.up { color: var(--status-good); background: var(--status-good-bg); }
+.yoy-chips .yc.down { color: var(--status-bad); background: var(--status-bad-bg); }
+/* จอแคบ: ให้ตารางกว้างพอดีการ์ด ไม่ต้องเลื่อนซ้าย-ขวา */
+@media (max-width: 1500px) { .t { font-size: 13px; } .t th { padding: 6px 6px; } .t td { padding: 5px 6px; } }
+@media (max-width: 1500px) { .t th { white-space: normal; } }
+@media (max-width: 1400px) { .t { font-size: 12.5px; } .t th, .t td { padding-left: 4px; padding-right: 4px; } .t .pill { padding-left: 6px; padding-right: 6px; } }
+.t tr.water td { font-weight: 700; color: var(--heading); background: color-mix(in srgb, var(--accent) 9%, var(--card)); border-top: 2px solid var(--accent); border-bottom: 2px solid var(--accent); }
+
+.mix-t .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: middle; }
+.mix-t th.c-g { text-align: center; border-bottom: 1px solid var(--line); }
+.mix-t thead tr:first-child th { border-bottom: 0; }
+/* หัวกลุ่มคอลัมน์ในตาราง */
+.grp-t thead tr.gh th { text-align: center; background: color-mix(in srgb, var(--accent) 12%, var(--th-bg)); border-bottom: 1px solid var(--line-strong); position: static; }
+.grp-t thead tr.gh th:first-child { text-align: left; vertical-align: bottom; }
+.grp-t thead tr:nth-child(2) th { position: static; }
+.grp-t .gs { border-left: 2px solid var(--line-strong); }

@@ -52,7 +52,7 @@
   const rowsOf = (ds) => ds.rows.map((r) => Object.fromEntries(ds.cols.map((c, i) => [c, r[i]])));
 
   // ---------- state ----------
-  const S = { cfg: null, d: {}, fetched: null, asof: null, f: {}, page: 'overview', charts: [] };
+  const S = { cfg: null, d: {}, fetched: null, asof: null, f: {}, page: 'snapshot', charts: [] };
   const $ = (id) => document.getElementById(id);
 
   async function getJSON(url) {
@@ -342,7 +342,8 @@
   }
 
   // ---------- pages ----------
-  const PAGES = { snapshot: pSnapshot, overview: pOverview, revenue: pRevenue, sales: pSales, usage: pUsage, customers: pCustomers, collections: pCollections, quality: pQuality };
+  // ซ่อนหน้า ภาพรวมผู้บริหาร (pOverview) และ คุณภาพข้อมูล (pQuality) ตามที่ผู้ใช้ขอ — โค้ดยังอยู่ เปิดกลับได้โดยเพิ่มใน PAGES และเมนู
+  const PAGES = { snapshot: pSnapshot, revenue: pRevenue, sales: pSales, usage: pUsage, customers: pCustomers, collections: pCollections };
   function render(opts = {}) {
     readTheme();
     disposeCharts();
@@ -986,16 +987,19 @@
     trs.push({ head: 'ลูกค้าสัญญารายใหญ่' });
     rows.filter((r) => r.g.cat === 'c').forEach((r) => trs.push(tRow(r.g.name, r.a, r.b)));
     trs.push(tRow('รวมลูกค้าสัญญารายใหญ่', subtotal('c', Y1), subtotal('c', Y0), 'sub'));
+    const both = (y) => { const g = subtotal('g', y), c = subtotal('c', y); const o = {}; Object.keys(g).forEach((k) => { o[k] = g[k] + c[k]; }); return o; };
+    trs.push(tRow('รวมรายได้ขายน้ำ (ทั่วไป + สัญญา)', both(Y1), both(Y0), 'water'));
     rows.filter((r) => r.g.cat === 'o').forEach((r) => trs.push(tRow(r.g.name, r.a, r.b)));
     trs.push(tRow('งานขาย/บริการอื่น (ค่าติดตั้ง ฯลฯ)', { net: A('fee', Y1).fee }, { net: A('fee', Y0).fee }));
     trs.push(tRow('รวมรายได้ทั้งสิ้น', { net: t1 }, { net: t0 }, 'total'));
-    const tbl = `<div class="tbl-wrap"><table class="t" data-csvable="1"><thead><tr>
-      <th>กลุ่มลูกค้า</th><th class="n">รายได้ ${Y0 + 543} (บาท)</th><th class="n">รายได้ ${Y1 + 543} (บาท)</th><th class="n">YoY</th><th class="n">สัดส่วน ${Y1 + 543}</th>
-      <th class="n">ลบ.ม. ${Y1 + 543}</th><th class="n">บาท/ลบ.ม. ${Y0 + 543}</th><th class="n">บาท/ลบ.ม. ${Y1 + 543}</th><th class="n">ลูกค้า (ราย)</th><th class="n">รายได้/ราย/เดือน ${Y0 + 543}</th><th class="n">รายได้/ราย/เดือน ${Y1 + 543}</th></tr></thead><tbody>
+    const tbl = `<div class="tbl-wrap"><table class="t grp-t" data-csvable="1"><thead>
+      <tr class="gh"><th rowspan="2">กลุ่มลูกค้า</th><th class="c-g gs" colspan="4">💰 รายได้ (บาท)</th><th class="c-g gs" colspan="3">💧 ปริมาณน้ำ และราคาต่อหน่วย</th><th class="c-g gs" colspan="3">👥 ลูกค้า</th></tr>
+      <tr><th class="n gs">${Y0 + 543}</th><th class="n">${Y1 + 543}</th><th class="n">YoY</th><th class="n">สัดส่วน ${Y1 + 543}</th>
+      <th class="n gs">ลบ.ม. ${Y1 + 543}</th><th class="n">บาท/ลบ.ม. ${Y0 + 543}</th><th class="n">บาท/ลบ.ม. ${Y1 + 543}</th><th class="n gs">จำนวน (ราย)</th><th class="n">รายได้/ราย/เดือน ${Y0 + 543}</th><th class="n">รายได้/ราย/เดือน ${Y1 + 543}</th></tr></thead><tbody>
       ${trs.map((r) => r.head ? `<tr class="grp"><td colspan="11">${r.head}</td></tr>` : `<tr class="${r.cls || ''}"><td>${esc(r.label)}${r.label.startsWith('กปภ') && pwaGap.length ? ` <span class="pill warn" title="ไม่มีใบแจ้งหนี้ ${pwaGap.map(mLabel).join(', ')}">⚠ ไม่มีบิล ${pwaGap.length} เดือน</span>` : ''}</td>
-        <td class="n">${baht(r.b.net)}</td><td class="n">${baht(r.a.net)}</td><td class="n">${r.b.net ? pillChg(r.a.net, r.b.net) : '–'}</td><td class="n">${pct(t1 ? r.a.net / t1 : null)}</td>
-        <td class="n">${r.a.units ? int(r.a.units) : '–'}</td><td class="n">${fmtPU(r.b.units ? r.b.wnet / r.b.units : null)}</td><td class="n">${fmtPU(r.a.units ? r.a.wnet / r.a.units : null)}</td>
-        <td class="n">${r.a.cust ? int(r.a.cust) : '–'}</td><td class="n">${r.b.cm ? int(r.b.net / r.b.cm) : '–'}</td><td class="n">${r.a.cm ? int(r.a.net / r.a.cm) : '–'}</td></tr>`).join('')}
+        <td class="n gs">${baht(r.b.net)}</td><td class="n">${baht(r.a.net)}</td><td class="n">${r.b.net ? pillChg(r.a.net, r.b.net) : '–'}</td><td class="n">${pct(t1 ? r.a.net / t1 : null)}</td>
+        <td class="n gs">${r.a.units ? int(r.a.units) : '–'}</td><td class="n">${fmtPU(r.b.units ? r.b.wnet / r.b.units : null)}</td><td class="n">${fmtPU(r.a.units ? r.a.wnet / r.a.units : null)}</td>
+        <td class="n gs">${r.a.cust ? int(r.a.cust) : '–'}</td><td class="n">${r.b.cm ? int(r.b.net / r.b.cm) : '–'}</td><td class="n">${r.a.cm ? int(r.a.net / r.a.cm) : '–'}</td></tr>`).join('')}
       </tbody></table></div>`;
 
     // ตำบล x กลุ่ม
@@ -1049,6 +1053,10 @@
         ${card('c-rev', `รายได้แยกกลุ่มลูกค้า ${per}`, 'ไม่รวม VAT · หักส่วนลดและใบลดหนี้แล้ว · บาท/ลบ.ม. = รายได้ค่าน้ำ+ค่าบริการ ÷ ลบ.ม. ที่ออกใบแจ้งหนี้ · รายได้/ราย/เดือน = รายได้ ÷ จำนวนบิลรายเดือน · หน่วยน้ำลูกค้าสัญญาก่อน มี.ค. 69 จากไฟล์ตรวจเทียบ Pay2Head', 'สาขา (ตำบล) · ประเภทลูกค้า (ช่วงเดือนไม่มีผล: ใช้ ม.ค.–เดือนเต็มล่าสุด)', tbl, { csv: 1 })}
       </div>
       <div class="grid g2" style="margin-top:16px">
+        ${card('c-mix', `สัดส่วนรายได้ · ปริมาณน้ำ · จำนวนลูกค้า ปี ${Y1 + 543}`, 'คิดจากการขายน้ำ (ลูกค้าทั่วไป + ลูกค้าสัญญา = 100%) ไม่รวมงานขาย/บริการอื่น · เทียบได้ว่ากลุ่มไหนลูกค้าน้อยแต่สร้างรายได้มาก', 'สาขา · ประเภทลูกค้า', '<div class="chart" id="ch-mix" style="height:440px"></div>', { table: 1 })}
+        ${card('c-mixt', `สัดส่วนแยกกลุ่ม ${Y0 + 543} เทียบ ${Y1 + 543}`, 'ทุกคอลัมน์ = % ของยอดขายน้ำรวม (ทั่วไป + สัญญา) ในปีนั้น', 'สาขา · ประเภทลูกค้า', '<div id="t-mix"></div>', { csv: 1 })}
+      </div>
+      <div class="grid g2" style="margin-top:16px">
         ${card('c-revbar', `รายได้แยกกลุ่ม ${Y0 + 543} เทียบ ${Y1 + 543} (ล้านบาท)`, '', 'สาขา · ประเภทลูกค้า', '<div class="chart tall" id="ch-revbar"></div>', { table: 1 })}
         ${card('c-pu', 'รายได้ต่อหน่วยแยกกลุ่ม (บาท/ลบ.ม.)', `ปี ${Y1 + 543} · เส้นประ = ค่าเฉลี่ยทุกกลุ่ม`, 'สาขา · ประเภทลูกค้า', '<div class="chart tall" id="ch-pu"></div>', { table: 1 })}
       </div>
@@ -1074,6 +1082,33 @@
     ];
     chart($('ch-revbar'), { grid: { left: 8, right: 16, top: 36, bottom: 8, containLabel: true }, xAxis: { ...catAxis(cats), axisLabel: { ...baseText, interval: 0, rotate: 30 } }, yAxis: valAxis(), series: sb, tooltip: { ...chartTT(), formatter: ttMoney() } });
     chartTable('c-revbar', cats, sb.map((s) => ({ name: s.name, data: s.data })));
+    // ---- สัดส่วนรายได้ / ปริมาณน้ำ / ลูกค้า ----
+    const mr = rows.filter((r) => r.g.cat !== 'o');
+    const short = (n) => n.replace(' อัตราก้าวหน้า', '').replace(' (ท่าอากาศยานภูเก็ต)', '').replace(' (ขายส่ง)', '').replace(' (หอถังสูง)', '').replace(' ตำรวจภูธรภาค 8', ' ตำรวจ');
+    const MC = { 'T1': C.sky, 'T2': C.oliveChart, 'T2.1': '#9BB87A', 'T3': C.navy, 'T3.1': '#E8833A', 'T2.2': C.neutral, 'T2.3': '#B07CC6' };
+    const tot3 = (y) => ({ net: sum(mr, (r) => (y === Y1 ? r.a : r.b).net), units: sum(mr, (r) => (y === Y1 ? r.a : r.b).units), cust: sum(mr, (r) => (y === Y1 ? r.a : r.b).cust) });
+    const T1x = tot3(Y1), T0x = tot3(Y0);
+    const sh = (v, t) => (t ? v / t : null);
+    const MK = [['net', 'รายได้'], ['units', 'ปริมาณน้ำ'], ['cust', 'จำนวนลูกค้า']];
+    const ms = mr.map((r) => ({ name: short(r.g.name), type: 'bar', stack: 'm', barWidth: 34, itemStyle: { color: MC[r.g.k] || C.neutral },
+      label: { show: true, formatter: (p) => (p.value >= 6 ? nf0.format(p.value) + '%' : ''), color: '#fff', fontFamily: 'Prompt', fontSize: 11 },
+      data: MK.map(([k]) => (T1x[k] ? Math.round(r.a[k] / T1x[k] * 1000) / 10 : 0)) }));
+    chart($('ch-mix'), { grid: { left: 8, right: 16, top: 56, bottom: 8, containLabel: true }, xAxis: { type: 'value', max: 100, axisLabel: { ...baseText, formatter: '{value}%' }, splitLine: { lineStyle: { color: C.grid } } },
+      yAxis: { type: 'category', inverse: true, data: MK.map((x) => x[1]), axisTick: { show: false }, axisLine: { lineStyle: { color: C.line } }, axisLabel: { ...baseText, fontWeight: 600 } },
+      series: ms, tooltip: { ...chartTT(), trigger: 'axis', axisPointer: { type: 'shadow' }, valueFormatter: (v) => nf1.format(v) + '%' } });
+    chartTable('c-mix', MK.map((x) => x[1]), ms.map((x) => ({ name: x.name, data: x.data })), 'p2');
+    const pc = (v) => (v == null ? '–' : v > 0 && v < 0.0005 ? '<0.1%' : nf1.format(v * 100) + '%');
+    const dpp = (a, b) => (a == null || b == null ? '' : (() => { const d = (a - b) * 100; return Math.abs(d) < 0.05 ? '' : ` <span class="small" style="color:var(--${d > 0 ? 'status-good' : 'status-bad'})">${d > 0 ? '▲' : '▼'}${nf1.format(Math.abs(d))}</span>`; })());
+    const cell = (r, k, cls) => { const a = sh(r.a[k], T1x[k]), b = sh(r.b[k], T0x[k]); return `<td class="n gs ${cls || ''}">${pc(b)}</td><td class="n ${cls || ''}"><b>${pc(a)}</b>${dpp(a, b)}</td>`; };
+    const subR = (cat, label) => { const rs = mr.filter((r) => r.g.cat === cat); const f = (y) => ({ net: sum(rs, (r) => (y === Y1 ? r.a : r.b).net), units: sum(rs, (r) => (y === Y1 ? r.a : r.b).units), cust: sum(rs, (r) => (y === Y1 ? r.a : r.b).cust) }); return { g: { name: label }, a: f(Y1), b: f(Y0), sub: 1 }; };
+    const mixRows = [{ head: 'ลูกค้าทั่วไป' }, ...mr.filter((r) => r.g.cat === 'g'), subR('g', 'รวมลูกค้าทั่วไป'), { head: 'ลูกค้าสัญญารายใหญ่' }, ...mr.filter((r) => r.g.cat === 'c'), subR('c', 'รวมลูกค้าสัญญา')];
+    const yy = (y) => String(y + 543).slice(2);
+    $('t-mix').innerHTML = `<div class="tbl-wrap" style="max-height:none"><table class="t mix-t grp-t" data-csvable="1"><thead>
+      <tr class="gh"><th rowspan="2">กลุ่ม</th><th class="c-g gs" colspan="2">💰 สัดส่วนรายได้</th><th class="c-g gs" colspan="2">💧 สัดส่วนปริมาณน้ำ</th><th class="c-g gs" colspan="2">👥 สัดส่วนลูกค้า</th></tr>
+      <tr><th class="n gs">${Y0 + 543}</th><th class="n">${Y1 + 543}</th><th class="n gs">${Y0 + 543}</th><th class="n">${Y1 + 543}</th><th class="n gs">${Y0 + 543}</th><th class="n">${Y1 + 543}</th></tr></thead><tbody>
+      ${mixRows.map((r) => (r.head ? `<tr class="grp"><td colspan="7">${r.head}</td></tr>` : `<tr class="${r.sub ? 'sub' : ''}"><td class="nw">${r.g.k ? `<span class="dot" style="background:${MC[r.g.k]}"></span>` : ''}${esc(short(r.g.name))}</td>${cell(r, 'net')}${cell(r, 'units')}${cell(r, 'cust')}</tr>`)).join('')}
+      <tr class="total"><td>รวมขายน้ำ</td><td class="n gs">100%</td><td class="n">100%</td><td class="n gs">100%</td><td class="n">100%</td><td class="n gs">100%</td><td class="n">100%</td></tr>
+      </tbody></table></div><div class="small" style="margin-top:6px;color:var(--text-2)">▲▼ = เปลี่ยนกี่จุด % จากปีก่อน · ลูกค้า = จำนวนรายที่มีบิลในช่วง</div>`;
     const puRows = rows.filter((r) => r.g.cat !== 'o' && r.a.units).sort((a, b) => pu(a.a) - pu(b.a));
     const avg = uAll1 ? wAll1 / uAll1 : 0;
     const ps = [{ name: 'บาท/ลบ.ม.', type: 'bar', barMaxWidth: 26, itemStyle: barStyle(C.navy), data: puRows.map((r) => Math.round(pu(r.a) * 100) / 100),
@@ -1104,12 +1139,16 @@
         ${kpi('ลูกค้าที่ใช้น้ำลดลง ≥ 10%', int(sum(st.filter((r) => r.k === 'down'), (r) => r.n)), 'ราย', `ลดลงรวม ${int(sum(st.filter((r) => r.k === 'down'), (r) => r.q0 - r.q1))} ลบ.ม. · หยุดใช้ ${int(sum(st.filter((r) => r.k === 'stop'), (r) => r.n))} ราย`)}
         ${kpi('ลูกค้าที่ใช้น้ำเพิ่มขึ้น ≥ 10%', int(sum(st.filter((r) => r.k === 'up'), (r) => r.n)), 'ราย', `เพิ่มรวม ${int(sum(st.filter((r) => r.k === 'up'), (r) => r.q1 - r.q0))} ลบ.ม. · ใหม่ ${int(sum(st.filter((r) => r.k === 'new'), (r) => r.n))} ราย`)}
       </div>
-      <div class="grid g2" style="margin-top:16px">
-        ${card('c-qd', `ปริมาณน้ำต่อวัน ม.ค. ${Y0 + 543} – ${mLabel(lastM)} (ลบ.ม./วัน)`, 'ลูกค้าเดิม = ผู้ใช้น้ำทั่วไปที่มีบิลก่อนปีนี้ (ไม่รวม กปภ. ทอท. หอถัง อบต. และลูกค้าใหม่) · หน่วยน้ำลูกค้าสัญญาก่อน มี.ค. 69 จากไฟล์ตรวจเทียบ Pay2Head', 'สาขา', '<div class="chart tall" id="ch-qd"></div>', { table: 1 })}
+      <div style="margin-top:16px">
+        ${card('c-qd', `<span id="qd-title"></span>`, `แท่ง = ปี ${Y1 + 543} แยกประเภทลูกค้า · เส้น = ยอดรวมปี ${Y1 + 543} เทียบปี ${Y0 + 543} รายเดือน (ม.ค.–ธ.ค.) · ลูกค้าสัญญา = ทอท. กปภ. อบต. · หน่วยน้ำลูกค้าสัญญาก่อน มี.ค. 69 จากไฟล์ตรวจเทียบ Pay2Head`, 'สาขา', `<div class="seg2" role="group" aria-label="ตัวชี้วัด"><button type="button" data-mt="u" aria-pressed="true">ปริมาณน้ำ (ลบ.ม./วัน)</button><button type="button" data-mt="r" aria-pressed="false">รายได้ค่าน้ำ (ล้านบาท)</button></div><div class="yoy-chips" id="qd-chips"></div><div class="chart tall" id="ch-qd"></div>`, { table: 1 })}
+      </div>
+      <div style="margin-top:16px">
         ${card('c-qst', `ลูกค้าตามการเปลี่ยนแปลงการใช้น้ำ ${per1} เทียบ ${per0}`, 'ลูกค้าทั่วไป (ไม่รวม กปภ. ทอท. หอถัง อบต.) · ช่วงเดียวกันทั้งสองปีเพื่อตัดผลฤดูกาล', 'สาขา', '<div id="t-qst"></div>', { csv: 1 })}
       </div>
-      <div class="grid g2" style="margin-top:16px">
+      <div style="margin-top:16px">
         ${card('c-qdecl', '20 อันดับลูกค้าทั่วไปที่ใช้น้ำลดลงมากที่สุด', `${per1} เทียบ ${per0} · ควรให้ฝ่ายขายติดต่อสอบถาม`, 'สาขา · ประเภทลูกค้า', '<div id="t-qdecl"></div>', { csv: 1 })}
+      </div>
+      <div style="margin-top:16px">
         ${card('c-aud', 'ตรวจทะเบียนเทียบการออกบิล', 'รายที่สถานะทะเบียนกับการออกบิลไม่สอดคล้อง (สาขาที่เปิดอยู่) · คำอธิบายจากหน้างานยังไม่มีในฐานข้อมูล', 'สาขา', '<div id="t-aud"></div>', { csv: 1 })}
       </div>`;
     const gs = ['up', 'flat', 'down', 'new', 'stop'].map((k) => { const x = st.filter((r) => r.k === k); const by = (b) => sum(x.filter((r) => r.br === b), (r) => r.n); return { k, mk: by('ไม้ขาว'), sk: by('สาคู'), n: sum(x, (r) => r.n), q0: sum(x, (r) => r.q0), q1: sum(x, (r) => r.q1) }; });
@@ -1127,14 +1166,55 @@
       { h: 'ทะเบียน', nw: 1, k: 'reg' }, { h: 'ชื่อ', f: (r) => esc(r.name || '–'), cls: 'name' }, { h: 'สาขา', nw: 1, k: 'br' }, { h: 'สถานะทะเบียน', nw: 1, f: (r) => esc(STATUS_TH[r.status] || r.status) },
       { h: 'บิลล่าสุด', nw: 1, f: (r) => (r.lb ? dLabel(r.lb) : 'ไม่เคยมีบิล') }, { h: 'ข้อสังเกต', f: (r) => `<span class="pill warn">⚠ ${esc(AUDIT[r.issue] || r.issue)}</span>` },
     ], au) : '<div class="state">ไม่พบรายการที่ไม่สอดคล้อง</div>';
-    const months = monthsBetween(`${Y0}-01`, lastM);
-    const ser = [
-      { name: 'รวมทั้งหมด', type: 'line', symbolSize: 6, lineStyle: { width: 2 }, itemStyle: { color: C.navy }, data: months.map((m) => Math.round(qd(m, (r) => r.qa))) },
-      { name: 'ไม่รวม กปภ.', type: 'line', symbolSize: 6, lineStyle: { width: 2 }, itemStyle: { color: C.oliveChart }, data: months.map((m) => Math.round(qd(m, (r) => r.qx))) },
-      { name: 'ลูกค้าเดิม (ทั่วไป)', type: 'line', symbolSize: 6, lineStyle: { width: 2, type: 'dashed' }, itemStyle: { color: C.text2 }, data: months.map((m) => Math.round(qd(m, (r) => r.qe))) },
-    ];
-    chart($('ch-qd'), { xAxis: catAxis(months.map(mLabel)), yAxis: valAxis((v) => nf0.format(v)), series: ser, tooltip: { ...chartTT(), axisPointer: { type: 'line' }, formatter: ttMoney('u') } });
-    chartTable('c-qd', months.map(mLabel), ser.map((s) => ({ name: s.name, data: s.data })), 'u');
+    drawYoY(Y0, Y1, lastM, S.qdMetric || 'u');
+    document.querySelectorAll('#c-qd .seg2 button').forEach((b) => b.addEventListener('click', () => {
+      S.qdMetric = b.dataset.mt;
+      document.querySelectorAll('#c-qd .seg2 button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+      drawYoY(Y0, Y1, lastM, S.qdMetric);
+    }));
+  }
+  // กราฟเทียบรายปี: แท่งซ้อน = ปีปัจจุบันแยก T1/T2/T3/ลูกค้าสัญญา · เส้น = ยอดรวมปีนี้ vs ปีก่อน (ม.ค.–ธ.ค.)
+  function drawYoY(Y0, Y1, lastM, mt) {
+    document.querySelectorAll('#c-qd .seg2 button').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.mt === mt)));
+    const mm = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'));
+    const days = (m) => new Date(Date.UTC(+m.slice(0, 4), +m.slice(5, 7), 0)).getUTCDate();
+    const has = (m) => S.months.includes(m) && m <= lastM;
+    const val = (m, tys) => { if (!has(m)) return null; const x = snapMonth(m, tys); return mt === 'u' ? Math.round(x.units / days(m)) : round2(x.net); };
+    const GR = [['T1', ['T1'], C.sky], ['T2', ['T2', 'T2.1'], C.oliveChart], ['T3', ['T3'], C.navy], ['ลูกค้าสัญญา (ทอท. กปภ. อบต.)', ['T3.1', 'T2.2', 'T2.3'], C.neutral]];
+    const ALL = GR.flatMap((g) => g[1]);
+    const y1 = (m) => `${Y1}-${m}`, y0 = (m) => `${Y0}-${m}`;
+    const tot = (m) => { const v = GR.map((g) => val(m, g[1])); return v.some((x) => x == null) ? null : (mt === 'u' ? v.reduce((a, b) => a + b, 0) : round2(v.reduce((a, b) => a + b, 0))); };
+    const mil = (v) => nf2.format(v / 1e6);
+    const ser = GR.map(([name, tys, color]) => ({ name, tys, type: 'bar', stack: 's', barMaxWidth: 34, itemStyle: barStyle(color), data: mm.map((m) => val(y1(m), tys)) }));
+    ser.push({ name: `รวมปี ${Y0 + 543}`, type: 'line', noPulse: true, symbolSize: 7, z: 5, lineStyle: { width: 2.5, type: 'dashed' }, itemStyle: { color: C.text2 }, data: mm.map((m) => tot(y0(m))) });
+    ser.push({ name: `รวมปี ${Y1 + 543}`, type: 'line', symbolSize: 8, z: 6, lineStyle: { width: 3 }, itemStyle: { color: '#E8833A' }, data: mm.map((m) => tot(y1(m))) });
+    const li = Number(lastM.slice(5, 7)) - 1, lv = ser[ser.length - 1].data[li];
+    if (!REDUCED && lastM.slice(0, 4) === String(Y1) && lv != null) ser.push({ type: 'effectScatter', name: '', data: [[TH_M[li], lv]], symbolSize: 9, z: 7, tooltip: { show: false }, silent: true, itemStyle: { color: '#E8833A' }, rippleEffect: { scale: 3.2, brushType: 'stroke', period: 2.4 }, animationDelay: 2200 });
+    const unitTxt = mt === 'u' ? 'ลบ.ม./วัน' : 'ล้านบาท';
+    $('qd-title').textContent = `${mt === 'u' ? 'ปริมาณน้ำต่อวัน' : 'รายได้ค่าน้ำ (ไม่รวม VAT)'} รายเดือน ปี ${Y1 + 543} เทียบ ${Y0 + 543} (${unitTxt})`;
+    const upto = mm.filter((m) => has(y1(m)));
+    const ytd = (Y, tys) => upto.reduce((a, m) => { const x = snapMonth(`${Y}-${m}`, tys); return a + (mt === 'u' ? x.units : x.net); }, 0);
+    const chip = (name, tys) => { const a = ytd(Y1, tys), b = ytd(Y0, tys); if (!b) return ''; const d = (a / b - 1) * 100;
+      if (Math.abs(d) < 0.05) return `<span class="yc"><b>${esc(name)}</b> ● ทรงตัว</span>`;
+      return `<span class="yc ${d >= 0 ? 'up' : 'down'}"><b>${esc(name)}</b> ${d >= 0 ? '▲ +' : '▼ '}${nf1.format(d)}%</span>`; };
+    $('qd-chips').innerHTML = `<span class="yc-l">${mt === 'u' ? 'ปริมาณน้ำ' : 'รายได้ค่าน้ำ'} ม.ค.–${TH_M[upto.length - 1]} ${Y1 + 543} เทียบช่วงเดียวกันปี ${Y0 + 543}:</span>` +
+      GR.map((g) => chip(g[0], g[1])).join('') + chip('รวม', ALL);
+    const fmtV = (v) => (v == null ? '–' : mt === 'u' ? nf0.format(v) : mil(v) + ' ล้านบาท');
+    const tt = (ps) => {
+      const arr = Array.isArray(ps) ? ps : [ps]; const i = arr[0].dataIndex;
+      const a = tot(y1(mm[i])), b = tot(y0(mm[i]));
+      const yoy = a != null && b ? ((a / b - 1) * 100) : null;
+      const yy = (v1, v0) => (v1 == null || !v0 ? '' : ` <span style="color:${v1 >= v0 ? C.good : C.bad}">${v1 >= v0 ? '▲ +' : '▼ '}${nf1.format((v1 / v0 - 1) * 100)}%</span>`);
+      return `<b>${TH_M[i]}</b> <span style="opacity:.7">(เทียบ ${TH_M[i]} ${Y0 + 543})</span><br>` + arr.filter((p) => p.seriesType !== 'effectScatter').map((p) => {
+        const g = GR.find((x) => x[0] === p.seriesName);
+        return `${p.marker}${esc(p.seriesName)}: <b>${fmtV(p.value)}</b>${g ? yy(p.value, val(y0(mm[i]), g[1])) : ''}`;
+      }).join('<br>') +
+        (yoy != null ? `<br><b>YoY ${yoy >= 0 ? '▲ +' : '▼ '}${nf1.format(yoy)}%</b>` : '');
+    };
+    const el = $('ch-qd'); const old = echarts.getInstanceByDom(el);
+    if (old) { S.charts = S.charts.filter((c) => c !== old); old.dispose(); }
+    chart(el, { grid: { left: 8, right: 16, top: 44, bottom: 8, containLabel: true }, xAxis: catAxis(TH_M), yAxis: valAxis((v) => (mt === 'u' ? nf0.format(v) : nf1.format(v / 1e6))), series: ser, tooltip: { ...chartTT(), trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: tt } });
+    chartTable('c-qd', TH_M, ser.filter((s) => s.type !== 'effectScatter').map((s) => ({ name: s.name, data: s.data })), mt === 'u' ? 'u' : undefined);
   }
 
   const Q = {
@@ -1213,8 +1293,17 @@
       initFilters();
       initTheme();
       const nt = $('nav-toggle');
-      const syncNav = () => nt.setAttribute('aria-expanded', String(!document.documentElement.classList.contains('nav-off')));
-      nt.onclick = () => { const off = document.documentElement.classList.toggle('nav-off'); try { localStorage.setItem('hea-dash-nav', off ? 'off' : 'on'); } catch (e) {} syncNav(); setTimeout(() => S.charts.forEach((c) => c.resize()), 260); };
+      // เมนูซ้ายซ่อนอัตโนมัติ: เลื่อนเมาส์ไปขอบซ้าย (หรือชี้ปุ่ม ☰) เมนูจะเลื่อนออกมาทับเนื้อหา · คลิก ☰ = ปักหมุดค้างไว้
+      const R = document.documentElement, side = document.querySelector('.side');
+      let peekT = null;
+      const syncNav = () => { nt.setAttribute('aria-expanded', String(R.classList.contains('nav-pin') || R.classList.contains('nav-peek'))); nt.classList.toggle('on', R.classList.contains('nav-pin')); };
+      const peek = (on) => { clearTimeout(peekT); if (on) { R.classList.add('nav-peek'); syncNav(); } else peekT = setTimeout(() => { R.classList.remove('nav-peek'); syncNav(); }, 280); };
+      $('nav-edge').addEventListener('mouseenter', () => peek(true));
+      side.addEventListener('mouseenter', () => peek(true));
+      side.addEventListener('mouseleave', () => peek(false));
+      side.addEventListener('click', (e) => { if (e.target.closest('a') && !R.classList.contains('nav-pin')) { clearTimeout(peekT); R.classList.remove('nav-peek'); syncNav(); } });
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && R.classList.contains('nav-peek')) { R.classList.remove('nav-peek'); syncNav(); } });
+      nt.onclick = () => { const pin = R.classList.toggle('nav-pin'); R.classList.remove('nav-peek'); try { localStorage.setItem('hea-dash-nav', pin ? 'pin' : 'auto'); } catch (e) {} syncNav(); setTimeout(() => S.charts.forEach((c) => c.resize()), 280); };
       syncNav();
       window.addEventListener('hashchange', route);
       window.addEventListener('resize', () => S.charts.forEach((c) => c.resize()));
