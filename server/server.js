@@ -17,7 +17,7 @@ const HISTORY_MONTHS = Number(process.env.HISTORY_MONTHS || 24);
 // ชุดข้อมูล -> ไฟล์ SQL (ทุกไฟล์รับ $1 = วันแรกของช่วง, $2 = วันอ้างอิง ยกเว้น meta)
 const DATASETS = {
   sales_cube: '01_sales_cube.sql',
-  dma_monthly: '02_dma_monthly.sql',
+  moo_monthly: '02_moo_monthly.sql',
   customers: '03_customers.sql',
   top_customers: '04_top_customers.sql',
   declines: '05_declines.sql',
@@ -31,6 +31,7 @@ const DATASETS = {
   revenue_groups: '13_revenue_groups.sql',
   pipeline: '15_pipeline.sql',
   usage_compare: '14_usage_compare.sql',
+  meter_reading: '16_meter_reading.sql',
 };
 const NO_PARAMS = new Set(['meta']);
 // ข้อมูลเสริมที่ไม่ได้อยู่ในฐานข้อมูล (ไฟล์ใน data/) — ใช้ทั้งโหมดสดและ snapshot

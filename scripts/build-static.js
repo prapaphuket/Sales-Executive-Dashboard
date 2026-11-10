@@ -59,7 +59,7 @@ rep('<div class="app">', `<div class="lock" id="lock">
   </div>
 </div>
 <div class="app" id="dash-root" hidden>`);
-rep('<div class="side-foot">', '<div class="userbar" id="userbar" hidden><span id="who"></span><button type="button" id="logout">ออกจากระบบ</button></div>\n    <div class="side-foot">');
+rep('<div class="hdr-user" id="hdr-user"></div>', '<div class="hdr-user" id="hdr-user"><div class="userbar" id="userbar" hidden><span id="who"></span><button type="button" id="logout">ออกจากระบบ</button></div></div>');
 rep('<script src="app.js"></script>', '<script>window.HEA_STATIC = 1;</script>\n<script src="vendor/msal-browser.min.js"></script>\n<script src="auth-config.js"></script>\n<script src="data.enc.js"></script>\n<script src="app.js"></script>\n<script src="gate.js"></script>');
 // กัน browser ใช้ไฟล์เก่าจาก cache หลังอัปเดต: ต่อท้าย ?v=<เวลา build> ให้ไฟล์ js/css ของเรา
 const ver = Date.now().toString(36);

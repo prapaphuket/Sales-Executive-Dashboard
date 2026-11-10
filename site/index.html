@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>HEA Sales Executive Dashboard</title>
-<script src="theme.js?v=mw9bsoa3"></script>
-<link rel="stylesheet" href="styles.css?v=mw9bsoa3">
-<link rel="stylesheet" href="gate.css?v=mw9bsoa3">
+<script src="theme.js?v=mwameq92"></script>
+<link rel="stylesheet" href="styles.css?v=mwameq92">
+<link rel="stylesheet" href="gate.css?v=mwameq92">
 </head>
 <body>
 <div class="lock" id="lock">
@@ -24,63 +24,58 @@
   </div>
 </div>
 <div class="app" id="dash-root" hidden>
-  <div class="nav-edge" id="nav-edge" aria-hidden="true"></div>
-  <aside class="side" aria-label="เมนูหลัก">
-    <div class="logo-zone">
-      <img class="logo" src="assets/hea-logo-white@2x.png" width="132" height="76"
+  <header class="hdr">
+    <div class="hdr-in">
+      <img class="logo" src="assets/hea-logo-white@2x.png" width="72" height="41"
            alt="HYDRO ENTERPRISE AND AQUA DESIGN — บริษัท ไฮโดรเอ็นเตอร์ไพร์ส แอนด์ อะควอดีซายน์ จำกัด">
+      <nav class="tabs" id="nav" aria-label="หน้ารายงาน">
+        <a href="#snapshot" data-page="snapshot">Executive Snapshot</a>
+        <a href="#revenue" data-page="revenue">รายได้ตามกลุ่มลูกค้า</a>
+        <a href="#usage" data-page="usage">การใช้น้ำเทียบปีก่อน</a>
+        <a href="#sales" data-page="sales">ยอดขายและการใช้น้ำ</a>
+        <a href="#customers" data-page="customers">ลูกค้า</a>
+        <a href="#collections" data-page="collections">การจัดเก็บและลูกหนี้</a>
+        <a href="#meter" data-page="meter">การจดมาตร</a>
+      </nav>
+      <div class="hdr-user" id="hdr-user"><div class="userbar" id="userbar" hidden><span id="who"></span><button type="button" id="logout">ออกจากระบบ</button></div></div>
+      <div class="seg" role="group" aria-label="ธีมการแสดงผล">
+        <button type="button" data-t="auto" aria-pressed="false" title="ตามการตั้งค่าของเครื่อง">อัตโนมัติ</button>
+        <button type="button" data-t="light" aria-pressed="false">☀ สว่าง</button>
+        <button type="button" data-t="dark" aria-pressed="false">☾ มืด</button>
+      </div>
     </div>
-    <nav class="nav" id="nav">
-      <a href="#snapshot" data-page="snapshot">Executive Snapshot</a>
-      <a href="#revenue" data-page="revenue">รายได้ตามกลุ่มลูกค้า</a>
-      <a href="#usage" data-page="usage">การใช้น้ำเทียบปีก่อน</a>
-      <a href="#sales" data-page="sales">ยอดขายและการใช้น้ำ</a>
-      <a href="#customers" data-page="customers">ลูกค้าและการเติบโต</a>
-      <a href="#collections" data-page="collections">การจัดเก็บและลูกหนี้</a>
-    </nav>
-    <div class="userbar" id="userbar" hidden><span id="who"></span><button type="button" id="logout">ออกจากระบบ</button></div>
-    <div class="side-foot">
-      <div class="co-th">บริษัท ไฮโดรเอ็นเตอร์ไพร์ส แอนด์ อะควอดีซายน์ จำกัด</div>
-      <div class="co-en">HYDRO ENTERPRISE AND AQUA DESIGN CO., LTD.</div>
-    </div>
-  </aside>
+  </header>
 
   <main class="main">
-    <header class="top">
-      <button type="button" class="nav-toggle" id="nav-toggle" aria-label="ปักหมุดเมนู / ซ่อนอัตโนมัติ" aria-expanded="false" title="คลิกเพื่อปักหมุดเมนูค้างไว้ · คลิกอีกครั้งเพื่อให้ซ่อนอัตโนมัติ">☰</button>
-      <div class="titles">
-        <h1>HEA Sales Executive Dashboard</h1>
-        <p class="subtitle">ภาพรวมยอดขายและการจัดเก็บธุรกิจน้ำประปา</p>
+    <section class="phead" aria-label="หัวรายงานและตัวกรอง">
+      <div class="ptitle">
+        <h1 id="page-title">HEA Sales Executive Dashboard</h1>
         <div class="asof-chip" id="asof-chip">กำลังโหลดข้อมูล…</div>
       </div>
-      <div class="top-tools">
-        <div class="seg" role="group" aria-label="ธีมการแสดงผล">
-          <button type="button" data-t="auto" aria-pressed="false" title="ตามการตั้งค่าของเครื่อง">อัตโนมัติ</button>
-          <button type="button" data-t="light" aria-pressed="false">☀ สว่าง</button>
-          <button type="button" data-t="dark" aria-pressed="false">☾ มืด</button>
+      <div class="pfilters" id="filters">
+        <label data-f="from">ตั้งแต่เดือน<select id="f-from"></select></label>
+        <label data-f="to"><span id="f-to-l">ถึงเดือน</span><select id="f-to"></select></label>
+        <label data-f="br">สาขา (ตำบล)<select id="f-br"></select></label>
+        <label data-f="ty">ประเภทลูกค้า<select id="f-ty"></select></label>
+        <label data-f="moo">หมู่<select id="f-moo"></select></label>
+        <label data-f="asof">วันอ้างอิงลูกหนี้<input type="date" id="f-asof"></label>
+        <div class="pf-links">
+          <button type="button" class="linkbtn" id="f-reset">ล้างตัวกรอง</button>
+          <details class="fx">
+            <summary>ตัวกรองมีผลกับอะไร</summary>
+            <div id="fx-body"></div>
+          </details>
         </div>
+        <div class="head-tools" id="head-tools"></div>
       </div>
-    </header>
-
-    <section class="filters" aria-label="ตัวกรอง">
-      <label>ตั้งแต่เดือน<select id="f-from"></select></label>
-      <label>ถึงเดือน<select id="f-to"></select></label>
-      <label>สาขา<select id="f-br"></select></label>
-      <label>ประเภทลูกค้า<select id="f-ty"></select></label>
-      <label>DMA<select id="f-dma"></select></label>
-      <label>วันอ้างอิงลูกหนี้<input type="date" id="f-asof"></label>
-      <button type="button" class="btn ghost" id="f-reset">ล้างตัวกรอง</button>
-      <details class="fx">
-        <summary>ตัวกรองมีผลกับอะไร</summary>
-        <div id="fx-body"></div>
-      </details>
     </section>
     <div class="banner" id="banner" hidden></div>
 
     <div id="page" class="page" tabindex="-1"></div>
     <section class="fresh" id="fresh" aria-label="ที่มาและเวลาของข้อมูล">กำลังโหลดข้อมูล…</section>
     <footer class="foot">
-      ตัวเลขเงินเป็นบาท · ยอดขายไม่รวม VAT และไม่รวมเงินประกัน · ยอดรับชำระตามใบเสร็จรวม VAT · ชื่อบุคคลธรรมดาถูกปิดตาม PDPA
+      <div>ตัวเลขเงินเป็นบาท · ยอดขายไม่รวม VAT และไม่รวมเงินประกัน · ยอดรับชำระตามใบเสร็จรวม VAT · ชื่อบุคคลธรรมดาถูกปิดตาม PDPA</div>
+      <div class="co">บริษัท ไฮโดรเอ็นเตอร์ไพร์ส แอนด์ อะควอดีซายน์ จำกัด · HYDRO ENTERPRISE AND AQUA DESIGN CO., LTD.</div>
     </footer>
   </main>
 </div>
@@ -90,12 +85,12 @@
   <div id="drill-body"></div>
 </dialog>
 
-<script src="vendor/echarts.min.js?v=mw9bsoa3"></script>
+<script src="vendor/echarts.min.js?v=mwameq92"></script>
 <script>window.HEA_STATIC = 1;</script>
-<script src="vendor/msal-browser.min.js?v=mw9bsoa3"></script>
-<script src="auth-config.js?v=mw9bsoa3"></script>
-<script src="data.enc.js?v=mw9bsoa3"></script>
-<script src="app.js?v=mw9bsoa3"></script>
-<script src="gate.js?v=mw9bsoa3"></script>
+<script src="vendor/msal-browser.min.js?v=mwameq92"></script>
+<script src="auth-config.js?v=mwameq92"></script>
+<script src="data.enc.js?v=mwameq92"></script>
+<script src="app.js?v=mwameq92"></script>
+<script src="gate.js?v=mwameq92"></script>
 </body>
 </html>

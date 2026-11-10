@@ -65,6 +65,7 @@
       $('dash-root').hidden = false;
       $('who').textContent = account.name || account.username || '';
       $('userbar').hidden = false;
+      $('logout').title = 'ผู้ใช้: ' + (account.name || account.username || '') + ' · คลิกเพื่อออกจากระบบ';
       $('logout').onclick = () => app.logoutRedirect({ account });
       window.HEADash.start(bundle);
     } catch (x) {
