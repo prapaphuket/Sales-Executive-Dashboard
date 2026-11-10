@@ -11,7 +11,7 @@ select json_build_object('ds', 'debtors', 'asof', to_char($2::date, 'YYYY-MM-DD'
   'n_overdue_cust', (select count(*) from agg where overdue > 0),
   'cols', json_build_array('cw','reg','name','br','ty','status','n','ar','overdue','oldest','b1','b2','b3','b4'),
   'rows', (select json_agg(json_build_array(t.cw, cw.registration_number,
-            case when cw.personal_type = 'company' or cw.ty in ('T2.2','T2.3','T3','T3.1') then nm.customer_name else 'บุคคลธรรมดา' end,
+            coalesce(nm.customer_name, '–'),
             coalesce(b.name, 'ไม่ระบุ'), coalesce(cw.ty, '?'), cw.status, t.n, round(t.ar, 2), round(t.overdue, 2), to_char(t.oldest, 'YYYY-MM-DD'),
             round(coalesce(t.b1, 0), 2), round(coalesce(t.b2, 0), 2), round(coalesce(t.b3, 0), 2), round(coalesce(t.b4, 0), 2)) order by t.overdue desc)
            from top t left join cw on cw.id = t.cw left join branches b on b.id = cw.branch_id left join nm on nm.cw = t.cw),

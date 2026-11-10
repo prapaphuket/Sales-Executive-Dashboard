@@ -135,9 +135,14 @@
     // หมู่ของแต่ละตำบล (ใช้แทน DMA ที่การผูกในทะเบียนยังไม่ครบ) · ค่า = "ตำบล|หมู่ N"
     const mooSet = new Set(S.mooM.concat(S.rev).filter((r) => MOO_BR.includes(r.br)).map((r) => r.br + '|' + r.moo));
     S.moos = [...mooSet].sort((a, b) => mooKey(a) - mooKey(b));
-    // เดือนที่ไม่มีใบแจ้งหนี้ กปภ. (T2.2) ทั้งที่ควรมีทุกเดือน -> เตือนเมื่อเปรียบเทียบ
+    // เดือนที่ไม่มีรายได้ กปภ. (T2.2): หน้าแล้งไม่มีน้ำส่ง หรือหลังสัญญาสิ้นสุด -> บอกเหตุเมื่อเปรียบเทียบ
     S.pwaMissing = months.filter((m) => m !== S.partialMonth && sum(S.sales.filter((r) => r.m === m && r.ty === 'T2.2' && (r.src === 'W' || r.src === 'L')), (r) => r.net) === 0);
   }
+  // กปภ. (T2.2): สัญญาขายส่งสิ้นสุดแล้ว (บิลสุดท้าย ก.ค. 69) · พ.ค. 69 หน้าแล้งไม่มีน้ำส่ง
+  const PWA_LAST = '2026-07', PWA_DRY = ['2026-05'];
+  const pwaWhy = (m) => (m > PWA_LAST ? 'สัญญาสิ้นสุดแล้ว' : PWA_DRY.includes(m) ? 'หน้าแล้งไม่มีน้ำส่ง' : 'ไม่พบใบแจ้งหนี้');
+  // สรุปเดือนที่ไม่มีรายได้ กปภ. ตามสาเหตุ เช่น "พ.ค. 69 หน้าแล้งไม่มีน้ำส่ง · ส.ค.–ต.ค. 69 สัญญาสิ้นสุดแล้ว"
+  const pwaTxt = (ms) => { const g = {}; ms.slice().sort().forEach((m) => (g[pwaWhy(m)] = g[pwaWhy(m)] || []).push(m)); return Object.entries(g).map(([w, l]) => `${l.length > 2 ? mLabel(l[0]) + '–' + mLabel(l[l.length - 1]) : l.map(mLabel).join(', ')} ${w}`).join(' · '); };
   const MOO_BR = ['ไม้ขาว', 'สาคู'];
   const mooNum = (m) => (/\d+/.test(m) ? +m.match(/\d+/)[0] : 99);
   const mooKey = (k) => { const [b, m] = k.split('|'); return MOO_BR.indexOf(b) * 100 + mooNum(m); };
@@ -422,6 +427,10 @@
     const marks = [[1, 'เปิดรอบ 1', 'done'], [METER_START, `เริ่มจด ${METER_START}`, 'done'], [eom, `ครบกำหนด ${eom} ${TH_M[mo - 1]}`, closed ? 'done' : 'todo'], [closed ? eom + delay : refDay, `วันอ้างอิง ${dLabel(ref)}`, 'now']];
     const sevPill = (d) => (d > 0 ? `<span class="pill down">+${d} วัน</span>` : d >= -METER_WARN_DAYS ? `<span class="pill warn">เหลือ ${-d} วัน</span>` : `<span class="pill na">เหลือ ${-d} วัน</span>`);
     const water = sum(S.sales.filter((r) => r.m === rnd && (r.src === 'W' || r.src === 'L')), (r) => r.net);
+    // ชื่อพื้นที่การอ่านมาตรจาก WMS · ชื่อยาวตัดด้วย … ชี้เมาส์เห็นชื่อเต็ม
+    const AN = D.area_names || {};
+    const aName = (id) => (id == null ? 'ไม่ระบุพื้นที่' : AN[id] || `พื้นที่ ${id}`);
+    const aCell = (id) => `<span class="trunc" title="${esc(aName(id))}">${esc(aName(id))}</span>`;
     const areas = rowsOf({ cols: D.areas_cols, rows: D.areas || [] }), staff = rowsOf({ cols: D.staff_cols, rows: D.staff || [] }), wrong = rowsOf({ cols: D.wrong_cols, rows: D.wrong || [] });
     setTitle(`การจดมาตรวัดน้ำ · รอบ ${mLong(rnd)}`);
     setScope(`จาก WMS · รอบ ${dLabel(D.round)} – ${dLabel(eomD)}`);
@@ -460,7 +469,7 @@
         ${card('c-mwrong', 'หน่วยน้ำผิดปกติ', `${int(sm.wrong)} ราย ในรอบนี้ · แสดง 20 รายที่ต่างจากค่าเฉลี่ยมากที่สุด (ลบ.ม.) · รายการทั้งหมดดูได้ใน WMS แผงควบคุมงานอ่านมาตร`, '', '<div id="t-mwrong"></div>', { csv: 1 })}
       </div>
       <div class="row">
-        ${card('c-marea', 'ความคืบหน้าตามพื้นที่การอ่านมาตร', 'ทะเบียนใช้งาน · พื้นที่ที่ยังค้างขึ้นก่อน · แสดงเป็นเลขพื้นที่ (ชื่อพื้นที่ยังไม่มีในข้อมูลที่ dashboard อ่านได้ และเลขพื้นที่เดียวกันอาจมีทั้งสองสาขา)', '', '<div id="t-marea"></div>', { csv: 1 })}
+        ${card('c-marea', 'ความคืบหน้าตามพื้นที่การอ่านมาตร', 'ทะเบียนใช้งาน · พื้นที่ที่ยังค้างขึ้นก่อน · ชื่อพื้นที่จาก WMS (ชื่อยาวชี้เมาส์เพื่อดูเต็ม)', '', '<div id="t-marea"></div>', { csv: 1 })}
       </div>
       <section class="card rules"><h3>กติกาและนิยาม</h3><ul>
         <li>เริ่มจดมาตรวันที่ <b>${METER_START}</b> ของเดือน และต้องจด<b>ครบภายในวันสิ้นเดือน</b> เพื่อออกใบแจ้งหนี้และรับรู้รายได้ในเดือนนั้น</li>
@@ -473,7 +482,7 @@
     $('t-mpend').innerHTML = pend.length ? table([
       { h: 'ทะเบียน', nw: 1, k: 'reg' },
       { h: 'ชื่อ / ประเภท', cls: 'name', f: (r) => `${esc(r.name || '–')} <span class="muted small">· ${esc(TY_NAME[r.ty] || r.ty)}</span>` + (['T2.2', 'T2.3', 'T3.1'].includes(r.ty) ? '<span class="warn-line">⚠ ลูกค้าสัญญา — ตรวจว่าจดแยก/ออกบิลตามสัญญาหรือไม่</span>' : ''), v: (r) => `${r.name || ''} (${r.ty})` },
-      { h: 'พื้นที่', nw: 1, f: (r) => `พื้นที่ ${esc(r.area ?? '–')}<br><span class="muted small">${esc(r.br)}</span>`, v: (r) => `${r.area} ${r.br}` },
+      { h: 'พื้นที่', cls: 'area', f: (r) => `${aCell(r.area)}<br><span class="muted small">${esc(r.br)}</span>`, v: (r) => `${aName(r.area)} (${r.br})` },
       { h: 'พนักงานที่รับผิดชอบ', f: (r) => (r.staff ? esc(r.staff) : '<span class="muted small">ไม่มีผู้จดรอบก่อน</span>'), v: (r) => r.staff || '' },
       { h: 'ดีเลย์', nw: 1, f: () => `${sevPill(delay)}<br><span class="muted small">ครบกำหนด ${dLabel(eomD)}</span>`, v: () => delay },
     ], pend) : '<div class="state">จดครบทุกทะเบียนแล้ว</div>';
@@ -489,7 +498,7 @@
     chartTable('c-mday', shown.map((x) => `${x.d} ${TH_M[mo - 1]} (${int(x.n)} ราย)`), ds.map((x) => ({ name: x.name, data: x.data })), 'p');
     // ตามพื้นที่
     $('t-marea').innerHTML = table([
-      { h: 'พื้นที่', nw: 1, f: (r) => `พื้นที่ ${esc(r.area ?? '–')}`, v: (r) => r.area }, { h: 'ทั้งหมด', n: 1, f: (r) => int(r.all) }, { h: 'จดได้', n: 1, f: (r) => int(r.read) },
+      { h: 'พื้นที่', cls: 'area', f: (r) => aCell(r.area), v: (r) => aName(r.area) }, { h: 'ทั้งหมด', n: 1, f: (r) => int(r.all) }, { h: 'จดได้', n: 1, f: (r) => int(r.read) },
       { h: 'ค้าง', n: 1, f: (r) => (r.all - r.read > 0 ? `<b class="v-bad">${int(r.all - r.read)}</b>` : '<span class="muted">0</span>'), v: (r) => r.all - r.read }, { h: 'ถูกตัดมาตร', n: 1, f: (r) => int(r.cut) }, { h: 'ออกใบแจ้งหนี้', n: 1, f: (r) => int(r.inv) },
       { h: 'ความคืบหน้า', cls: 'bar-cell', f: (r) => barCell(pp(r.all ? r.read / r.all : 0), r.all ? r.read / r.all : 0, 1, r.all - r.read > 0 ? C.orange : C.navy), v: (r) => pp(r.all ? r.read / r.all : 0) },
     ], areas, ['รวม', int(sum(areas, (r) => r.all)), int(sum(areas, (r) => r.read)), int(sum(areas, (r) => r.all - r.read)), int(sum(areas, (r) => r.cut)), int(sum(areas, (r) => r.inv)), '']);
@@ -582,7 +591,7 @@
     const coll = collAgg(from, to), collY = pc.yoyOk ? collAgg(addM(from, -12), addM(to, -12)) : null;
     const ar = arAgg();
     const naPartial = pc.partial ? 'ช่วงที่เลือกมีเดือนที่ยังไม่ครบ ข้อมูลรายเดือนไม่สามารถเทียบวันเดียวกันได้' : null;
-    const pwaWarn = pc.pwaGap.length ? 'กปภ. ไม่มีใบแจ้งหนี้ในเดือน ' + pc.pwaGap.map(mLabel).join(', ') + ' ทำให้การเปรียบเทียบคลาดเคลื่อน' : null;
+    const pwaWarn = pc.pwaGap.length ? 'ไม่มีรายได้ กปภ.: ' + pwaTxt(pc.pwaGap) + ' — เทียบกับช่วงที่ยังมี กปภ.' : null;
     const ytdFrom = to.slice(0, 4) + '-01';
     const ytd = salesAgg(ytdFrom, to), ytdP = addM(ytdFrom, -12) >= S.months[0] ? salesAgg(addM(ytdFrom, -12), addM(to, -12)) : null;
     const per = `${mLabel(from)}${from !== to ? ' – ' + mLabel(to) : ''}`;
@@ -606,7 +615,7 @@
       <div class="grid g4" style="margin-top:16px">
         ${kpi('สัดส่วนรับชำระต่อยอดแจ้งหนี้ (ค่าน้ำ)', pct(ratio), '', 'รับชำระค่าน้ำในช่วง ÷ ใบแจ้งหนี้ค่าน้ำในช่วง (รวม VAT) — ต่างรุ่นกัน ไม่ใช่อัตราเก็บเงิน')}
         ${kpi('อัตราเก็บเงินรายรุ่น (ใบแจ้งหนี้ระบบใหม่)', pct(cohort.billed ? cohort.paid / cohort.billed : null), '', cohort.billed ? `ใบแจ้งหนี้ออก ${cohort.mFrom ? mLabel(cohort.mFrom) + '–' + mLabel(cohort.mTo) : ''} ชำระแล้วถึง ${dLabel(S.asof)} · ตรงเวลา ${pct(cohort.ontime / cohort.billed)}` : 'มีข้อมูลตั้งแต่ มี.ค. 69 (ระบบใหม่)')}
-        ${kpi('ยอดขายสะสมทั้งปี (YTD)', mb(ytd.net), 'ล้านบาท', `${mLabel(ytdFrom)} – ${mLabel(to)}${to === S.lastFull ? ` · ประมาณการทั้งปี ${mb(forecastYear().fc)} ล้านบาท` : ''}`, cmpPill(ytd.net, ytdP && ytdP.net, 'YTD เทียบปีก่อน', { na: naPartial || (!ytdP && 'ไม่มีข้อมูลปีก่อนครบ'), warn: monthsBetween(ytdFrom, to).some((m) => S.pwaMissing.includes(m)) ? 'มีเดือนที่ กปภ. ยังไม่มีใบแจ้งหนี้' : null }))}
+        ${kpi('ยอดขายสะสมทั้งปี (YTD)', mb(ytd.net), 'ล้านบาท', `${mLabel(ytdFrom)} – ${mLabel(to)}${to === S.lastFull ? ` · ประมาณการทั้งปี ${mb(forecastYear().fc)} ล้านบาท` : ''}`, cmpPill(ytd.net, ytdP && ytdP.net, 'YTD เทียบปีก่อน', { na: naPartial || (!ytdP && 'ไม่มีข้อมูลปีก่อนครบ'), warn: monthsBetween(ytdFrom, to).some((m) => S.pwaMissing.includes(m)) ? 'มีเดือนที่ไม่มีรายได้ กปภ. (หน้าแล้ง/สัญญาสิ้นสุด)' : null }))}
         ${kpi('เป้ายอดขาย', 'ยังไม่กำหนดเป้า', '', 'ไม่มีข้อมูลเป้าในระบบ — จึงไม่แสดง % เทียบเป้า', '', 'target')}
       </div>
       <div class="grid g3" style="margin-top:16px">
@@ -676,7 +685,7 @@
       const a = salesAgg(lf, lf), b = salesAgg(ly, ly);
       if (b.net) {
         const ch = (a.net - b.net) / b.net;
-        out.push({ lvl: ch < -0.1 ? 'bad' : 'info', t: `ยอดขาย ${mLabel(lf)} ${ch >= 0 ? 'เพิ่ม' : 'ลดลง'} ${nf1.format(Math.abs(ch * 100))}% เทียบ ${mLabel(ly)}`, d: `${mb(a.net)} เทียบ ${mb(b.net)} ล้านบาท (ไม่รวม VAT)${S.pwaMissing.includes(lf) ? ' · เดือนนี้ไม่มีบิล กปภ.' : ''}` });
+        out.push({ lvl: ch < -0.1 ? 'bad' : 'info', t: `ยอดขาย ${mLabel(lf)} ${ch >= 0 ? 'เพิ่ม' : 'ลดลง'} ${nf1.format(Math.abs(ch * 100))}% เทียบ ${mLabel(ly)}`, d: `${mb(a.net)} เทียบ ${mb(b.net)} ล้านบาท (ไม่รวม VAT)${S.pwaMissing.includes(lf) ? ' · เดือนนี้ไม่มีรายได้ กปภ. (' + pwaWhy(lf) + ')' : ''}` });
       }
     }
     if (ar.b[4]) out.push({ lvl: 'warn', t: `หนี้ค่าน้ำเกิน 90 วัน ${mb(ar.b[4])} ล้านบาท`, d: `ในนี้เป็นหนี้จากระบบเดิม (ออกก่อน มี.ค. 69) ${mb(sum(ar.rows.filter((r) => r.bk === 4 && r.legacy), (r) => r.amt))} ล้านบาท บางรายผู้ใช้น้ำถูกงดจ่ายน้ำแล้ว ควรพิจารณาติดตามหรือตั้งสำรอง` });
@@ -864,7 +873,7 @@
   }
   // หมายเหตุลูกค้ารายใหญ่ที่ตัวเลขเปลี่ยนเพราะข้อมูล ไม่ใช่พฤติกรรมการใช้น้ำ (อ้างอิง customer_water_id)
   const KNOWN = {
-    4: () => (S.pwaMissing.length ? 'ไม่มีใบแจ้งหนี้ค่าน้ำเดือน ' + S.pwaMissing.map(mLabel).join(', ') + ' — ยอดลดเพราะยังไม่ออกบิล ไม่ใช่การใช้น้ำลดลง' : ''),
+    4: () => 'สัญญาขายส่งสิ้นสุดแล้ว (บิลสุดท้าย ' + mLabel(PWA_LAST) + ') · ' + mLabel(PWA_DRY[0]) + ' หน้าแล้งไม่มีน้ำส่ง — ยอดลดเพราะหยุดส่งน้ำ ไม่ใช่ข้อมูลขาด',
     1363: () => 'ระบบเดิมออกบิลหอถังของ อบต. รวมไว้ที่ทะเบียนนี้ ระบบใหม่ (มี.ค. 69) แยกเป็นทะเบียนประเภท T2.3 — ยอดที่ลดส่วนใหญ่ย้ายไปทะเบียนใหม่',
   };
   // คำเตือนของแถว (กปภ., ทะเบียนหอถังเดิม ฯลฯ) เป็นกล่องเหลืองใต้ชื่อ
@@ -886,7 +895,7 @@
       </div>
       <div class="row">
         ${card('c-coll', 'ยอดรับชำระรายเดือนตามประเภท', 'ล้านบาท รวม VAT · ตามวันที่รับชำระ (ไม่มีวันที่ใช้วันที่ใบเสร็จ) · ไม่ใช่ยอดขาย', 'ช่วงเดือน · สาขา', '<div class="chart" id="ch-coll"></div>', { table: 1, min: 520 })}
-        ${card('c-ratio', 'สัดส่วนรับชำระต่อยอดแจ้งหนี้ค่าน้ำ รายเดือน', 'รับชำระในเดือน ÷ แจ้งหนี้ในเดือน (คนละรุ่นเอกสาร จึงเกิน 100% ได้) · ⚠ = กปภ. ไม่มีใบแจ้งหนี้', 'ช่วงเดือน · สาขา', '<div class="chart" id="ch-ratio"></div>', { table: 1, min: 520 })}
+        ${card('c-ratio', 'สัดส่วนรับชำระต่อยอดแจ้งหนี้ค่าน้ำ รายเดือน', 'รับชำระในเดือน ÷ แจ้งหนี้ในเดือน (คนละรุ่นเอกสาร จึงเกิน 100% ได้) · ⚠ = เดือนที่ไม่มีรายได้ กปภ. (หน้าแล้ง/สัญญาสิ้นสุด)', 'ช่วงเดือน · สาขา', '<div class="chart" id="ch-ratio"></div>', { table: 1, min: 520 })}
       </div>
       <div class="row">
         ${card('c-ar', 'อายุลูกหนี้ ณ ' + dLabel(S.asof), 'บาท รวม VAT · ค่าน้ำตามวันครบกำหนด · ใบแจ้งหนี้งานขายไม่มีวันครบกำหนดในข้อมูล จึงแยกเป็น “ไม่มีวันครบกำหนด”', 'สาขา (ตำบล) · ประเภทลูกค้า · วันอ้างอิงลูกหนี้', '<div id="ar-br"></div><div id="t-ar"></div>', { csv: 1, table: 1, w: 1.2, min: 600 })}
@@ -1265,7 +1274,7 @@
       <tr class="gh"><th rowspan="2">กลุ่มลูกค้า</th><th class="c-g gs" colspan="4">รายได้ (ล้านบาท)</th><th class="c-g gs" colspan="3">ปริมาณน้ำและราคาต่อหน่วย</th><th class="c-g gs" colspan="3">ลูกค้า</th></tr>
       <tr><th class="n gs">${Y0 + 543}</th><th class="n">${Y1 + 543}</th><th class="n">YoY</th><th class="n">สัดส่วน</th>
       <th class="n gs">ลบ.ม. ${Y1 + 543}</th><th class="n">บาท/ลบ.ม. ${(Y0 + 543) % 100}</th><th class="n">บาท/ลบ.ม. ${(Y1 + 543) % 100}</th><th class="n gs">จำนวน (ราย)</th><th class="n">บาท/ราย/เดือน ${(Y0 + 543) % 100}</th><th class="n">บาท/ราย/เดือน ${(Y1 + 543) % 100}</th></tr></thead><tbody>
-      ${trs.map((r) => r.head ? `<tr class="grp"><td colspan="11">${r.head}</td></tr>` : `<tr class="${r.cls || ''}"><td>${esc(r.label)}${r.label.startsWith('กปภ') && pwaGap.length ? ` <span class="pill warn" title="ไม่มีใบแจ้งหนี้ ${pwaGap.map(mLabel).join(', ')}">⚠ ไม่มีบิล ${pwaGap.length} เดือน</span>` : ''}</td>
+      ${trs.map((r) => r.head ? `<tr class="grp"><td colspan="11">${r.head}</td></tr>` : `<tr class="${r.cls || ''}"><td>${esc(r.label)}${r.label.startsWith('กปภ') && pwaGap.length ? ` <span class="pill warn" title="${esc(pwaTxt(pwaGap))}">⚠ ไม่มีรายได้ ${pwaGap.length} เดือน</span>` : ''}</td>
         <td class="n gs muted" ${mbv(r.b.net)}>${mb(r.b.net)}</td><td class="n" ${mbv(r.a.net)}><b>${mb(r.a.net)}</b></td><td class="n">${r.b.net ? pillChg(r.a.net, r.b.net) : '–'}</td><td class="n">${pct(t1 ? r.a.net / t1 : null)}</td>
         <td class="n gs">${r.a.units ? int(r.a.units) : '–'}</td><td class="n">${fmtPU(r.b.units ? r.b.wnet / r.b.units : null)}</td><td class="n">${fmtPU(r.a.units ? r.a.wnet / r.a.units : null)}</td>
         <td class="n gs">${r.a.cust ? int(r.a.cust) : '–'}</td><td class="n">${r.b.cm ? int(r.b.net / r.b.cm) : '–'}</td><td class="n">${r.a.cm ? int(r.a.net / r.a.cm) : '–'}</td></tr>`).join('')}
@@ -1296,7 +1305,7 @@
     const ex1 = t1 - pwa1, ex0 = t0 - pwa0;
     const moov = moo.filter((x) => x.n0 > 300000 && x.moo !== 'ไม่ระบุหมู่').map((x) => ({ ...x, c: chg(x.n1, x.n0) })).sort((a, b) => a.c - b.c);
     const ins = [];
-    if (t0) ins.push(['bad', `รายได้รวม ${per} ${pctTxt(chg(t1, t0))} (${mb(t1)} เทียบ ${mb(t0)} ล้านบาท)`, `ส่วนที่หายไปมาจาก กปภ. ${mb(pwa1 - pwa0)} ล้านบาท${pwaGap.length ? ` (ไม่มีใบแจ้งหนี้ ${pwaGap.map(mLabel).join(', ')} — พ.ค. ไม่มีการส่งน้ำช่วงแล้ง และสัญญาขายส่งสิ้นสุดหลัง ก.ค. 69)` : ''} · ถ้าไม่นับ กปภ. รายได้ ${pctTxt(chg(ex1, ex0))}`]);
+    if (t0) ins.push(['bad', `รายได้รวม ${per} ${pctTxt(chg(t1, t0))} (${mb(t1)} เทียบ ${mb(t0)} ล้านบาท)`, `ส่วนที่หายไปมาจาก กปภ. ${mb(pwa1 - pwa0)} ล้านบาท${pwaGap.length ? ` (${pwaTxt(pwaGap)})` : ''} · ถ้าไม่นับ กปภ. รายได้ ${pctTxt(chg(ex1, ex0))}`]);
     if (T3.net) ins.push(['info', `T3 เป็นแหล่งรายได้หลัก ${pct(T3.net / t1)} ของรายได้ และโต ${pctTxt(chg(T3.net, T3b.net))}`, `ปริมาณน้ำ T3 ${pctTxt(chg(T3.units, T3b.units))} ขณะราคาต่อหน่วยคงที่ ${fmtPU(pu(T3))} บาท/ลบ.ม. — การเติบโตมาจากปริมาณใช้น้ำของโรงแรม/คอนโด ลูกค้าเพียง ${int(T3.cust)} ราย รายได้เฉลี่ย ${int(arpu(T3))} บาท/ราย/เดือน`]);
     if (HT.units) ins.push(['warn', `อบต.ไม้ขาว (หอถังสูง) ใช้น้ำมากที่สุด ${int(HT.units)} ลบ.ม. แต่ราคาต่ำสุด ${fmtPU(pu(HT))} บาท/ลบ.ม.`, `เทียบ T1 ${fmtPU(pu(A('T1', Y1)))} · กปภ. ${fmtPU(pu(PW))} · ทอท. ${fmtPU(pu(AOT))} · T3 ${fmtPU(pu(T3))} บาท/ลบ.ม. — ทุก 1 บาท/ลบ.ม. ≈ ${mb(HT.units / months * 12)} ล้านบาท/ปี`]);
     if (T2.cust && T2b.cust) ins.push(['info', `T2 ลูกค้าเพิ่ม ${pctTxt(chg(T2.cust, T2b.cust))} แต่รายได้ต่อรายลดลง ${pctTxt(chg(arpu(T2), arpu(T2b)))}`, `รายได้ T2 รวม ${pctTxt(chg(T2.net, T2b.net))} — ลูกค้าใหม่ใช้น้ำน้อยกว่ารายเดิม ปริมาณน้ำรวม ${pctTxt(chg(T2.units, T2b.units))}`]);
@@ -1316,7 +1325,7 @@
     const nameS = (n) => n.replace(' อัตราก้าวหน้า', '').replace(' (ท่าอากาศยานภูเก็ต)', '').replace(' (ขายส่ง)', '').replace(' ตำรวจภูธรภาค 8', ' ตำรวจ');
     el.innerHTML = `
       <div class="kpis">
-        ${kpi(`รายได้ ${per}`, mb(t1), 'ล้านบาท', `รายได้ทุกกลุ่มลูกค้า ไม่รวม VAT · ปีก่อน ${mb(t0)} ล้านบาท${pwaGap.length ? ' · มีเดือนที่ กปภ. ไม่มีใบแจ้งหนี้' : ''}`, [cmpRow('YoY', t1, t0, { warn: pwaGap.length ? 'มีเดือนที่ กปภ. ไม่มีใบแจ้งหนี้' : null }), ['ปีก่อน', mb(t0) + ' ล้าน', 'v-mute']])}
+        ${kpi(`รายได้ ${per}`, mb(t1), 'ล้านบาท', `รายได้ทุกกลุ่มลูกค้า ไม่รวม VAT · ปีก่อน ${mb(t0)} ล้านบาท${pwaGap.length ? ' · ไม่มีรายได้ กปภ. ' + pwaTxt(pwaGap) : ''}`, [cmpRow('YoY', t1, t0, { warn: pwaGap.length ? 'มีเดือนที่ไม่มีรายได้ กปภ. (หน้าแล้ง/สัญญาสิ้นสุด)' : null }), ['ปีก่อน', mb(t0) + ' ล้าน', 'v-mute']])}
         ${kpi('รายได้ไม่รวม กปภ.', mb(ex1), 'ล้านบาท', `ฐานธุรกิจต่อเนื่อง (ไม่นับน้ำขายส่ง กปภ. ที่สัญญาสิ้นสุด) · ปีก่อน ${mb(ex0)} ล้านบาท`, [cmpRow('YoY', ex1, ex0), ['ปีก่อน', mb(ex0) + ' ล้าน', 'v-mute']], 'accent')}
         ${kpi('ราคาเฉลี่ยต่อหน่วย', nf2.format(uAll1 ? wAll1 / uAll1 : 0), 'บาท/ลบ.ม.', 'รายได้ค่าน้ำ+บริการ ÷ ลบ.ม. ที่ออกใบแจ้งหนี้ ทุกกลุ่มที่มีหน่วยน้ำ', [['ปริมาณน้ำ', int(uAll1) + ' ลบ.ม.', 'v-mute']])}
         ${kpi('รายได้ต่อราย/เดือน (ลูกค้าทั่วไป)', int(cmGen1 ? g1.net / cmGen1 : 0), 'บาท', 'รายได้ลูกค้าทั่วไป ÷ จำนวนบิลรายเดือน', [cmpRow('YoY', cmGen1 ? g1.net / cmGen1 : 0, g0.cm ? g0.net / g0.cm : 0), ['ลูกค้าทั่วไป', int(g1.cust) + ' ราย', 'v-mute']])}
@@ -1557,7 +1566,7 @@
   function pQuality(el) {
     const items = S.d.quality.items;
     const notes = [
-      ['กปภ. (T2.2) ไม่มีใบแจ้งหนี้บางเดือน (พ.ค. 69 ไม่มีการส่งน้ำ, สัญญาสิ้นสุดหลัง ก.ค. 69)', S.pwaMissing.length ? S.pwaMissing.map(mLabel).join(', ') : 'ไม่พบ', 'ยอดขายเดือนดังกล่าวลดลงจริง · การเปรียบเทียบ YoY ติดเครื่องหมาย ⚠ เพื่อให้รู้ว่าเปรียบเทียบกับช่วงที่ยังมี กปภ.'],
+      ['กปภ. (T2.2) ไม่มีรายได้บางเดือน: สัญญาขายส่งสิ้นสุดแล้ว (บิลสุดท้าย ก.ค. 69) และ พ.ค. 69 หน้าแล้งไม่มีน้ำส่ง', S.pwaMissing.length ? pwaTxt(S.pwaMissing) : 'ไม่พบ', 'ยอดขายเดือนดังกล่าวลดลงจริง · การเปรียบเทียบ YoY ติดเครื่องหมาย ⚠ เพื่อให้รู้ว่าเปรียบเทียบกับช่วงที่ยังมี กปภ.'],
       ['ลูกค้ารายใหญ่ 3 ราย (กปภ. ทอท. หอถัง อบต.) ก่อน มี.ค. 69 ออกบิลในระบบงานขาย ไม่มีหน่วยน้ำ', 'นำยอดเงินจากใบแจ้งหนี้งานขาย (INT/IMK) มารวมเป็นค่าน้ำ + เติมหน่วยน้ำ (ลบ.ม.) จากไฟล์ตรวจเทียบ Pay2Head 389 ใบ (ยอดเงินตรงกับ WMS ทุกเดือน)', `ใช้ชั่วคราวจนกว่าโปรแกรมเมอร์นำเข้า WMS${S.legAdded.length ? ' · เพิ่มบิลที่ WMS ไม่มี: ' + S.legAdded.map((x) => (x.ty === 'T2.2' ? 'กปภ.' : x.ty) + ' ' + mLabel(x.m) + ' ' + baht(x.amt) + ' บาท').join(', ') : ''}`],
       ['สาขา “นาเตย” ในข้อมูล', 'นาเตยเป็นชื่อสาขาไม้ขาวในระบบเดิม — รวมเข้าสาขาไม้ขาวทุกหน้า', 'ตัวเลขสาขาไม้ขาวครบขึ้น'],
       ['ใบแจ้งหนี้ซ้ำทุกค่า', 'ตัดเหลือ 1 ใบ — ตรงกับไฟล์ตรวจ (ในช่วงรายงานมี 8 แถว 87,605.63 บาท ส่วนใหญ่ 6,300 แถวเป็นปี 2565 อยู่นอกช่วง)', 'ยอดขายไม่นับซ้ำ'],
@@ -1566,7 +1575,7 @@
       ['ส่วนลดในใบแจ้งหนี้ค่าน้ำรวม VAT แต่ VAT ไม่ถูกลดตาม (WMS-307)', 'ยอดขายถอด VAT ออกจากส่วนลดตามสัดส่วน', 'ยอดรวม VAT ใน dashboard อาจต่างจากยอดในใบแจ้งหนี้เล็กน้อย'],
       ['ลูกหนี้คำนวณได้เฉพาะ ณ วันที่ดึงข้อมูล', 'ระบบไม่เก็บประวัติสถานะรายวัน', 'การเลือกวันอ้างอิงย้อนหลังในโหมดสดจะใช้สถานะปัจจุบันของเอกสาร'],
       ['ประเภทลูกค้าและสาขาใช้ค่าในทะเบียนปัจจุบัน · หมู่ใช้ที่อยู่ในใบแจ้งหนี้ล่าสุด', 'ไม่ใช่ค่า ณ วันที่ออกบิล', 'ลูกค้าที่ย้ายประเภทจะถูกนับในประเภทใหม่ทั้งช่วง'],
-      ['ชื่อบุคคลธรรมดาถูกปิด', 'แสดงชื่อเฉพาะนิติบุคคล หน่วยงาน และลูกค้าประเภท T2.2/T2.3/T3/T3.1', 'ตาม PDPA และข้อกำหนดไม่แสดงข้อมูลส่วนบุคคลเกินจำเป็น'],
+      ['ชื่อลูกค้าแสดงเต็ม', 'ลูกค้ายินยอมให้เปิดเผยชื่อตอนสมัครใช้น้ำ · ชื่อมาจากใบแจ้งหนี้ล่าสุด', 'ไม่แสดงเลขบัตร เบอร์โทร ที่อยู่ และบัญชีธนาคาร (ไม่จำเป็นต่อ dashboard)'],
     ];
     el.innerHTML = `
       <h2 class="sec-title">คุณภาพข้อมูลและนิยาม</h2>
@@ -1588,7 +1597,7 @@
     ['อัตราเก็บเงินรายรุ่น', 'ยอดใบแจ้งหนี้ค่าน้ำรุ่นเดือน X ที่ชำระแล้ว (ใบเสร็จถึงวันอ้างอิง) ÷ ยอดแจ้งหนี้รุ่นเดียวกัน · ตรงเวลา = ชำระภายในวันครบกำหนด · เฉพาะระบบใหม่ (มี.ค. 69 เป็นต้นไป)', 'เดือนออกใบแจ้งหนี้ + วันอ้างอิง'],
     ['ลูกหนี้คงค้าง / อายุหนี้', 'ใบแจ้งหนี้ค่าน้ำสถานะค้างชำระ ออก ≤ วันอ้างอิง แบ่งช่วง ยังไม่ครบกำหนด / 1–30 / 31–60 / 61–90 / > 90 วันหลังวันครบกำหนด (ไม่ซ้อนกัน รวมกันเท่ายอดคงค้าง) + ใบแจ้งหนี้งานขายค้างชำระ (ไม่มีวันครบกำหนด)', 'วันอ้างอิง'],
     ['ลูกค้าที่ออกใบแจ้งหนี้', 'จำนวนผู้ใช้น้ำที่มีใบแจ้งหนี้ค่าน้ำ (ไม่ยกเลิก) ในเดือน · ลูกค้าใหม่ = ใบแรกในประวัติอยู่ในเดือนนั้น', 'วันที่ออกใบแจ้งหนี้'],
-    ['MoM / YoY / YTD', 'เทียบช่วงยาวเท่ากันก่อนหน้า / ช่วงเดียวกันปีก่อน / ม.ค.–เดือนที่เลือก เทียบปีก่อน · ไม่แสดงเมื่อไม่มีข้อมูลฐานหรือเดือนไม่ครบ · ⚠ เมื่อมีเดือนที่ กปภ. ไม่มีใบแจ้งหนี้', 'วันที่ออกเอกสาร'],
+    ['MoM / YoY / YTD', 'เทียบช่วงยาวเท่ากันก่อนหน้า / ช่วงเดียวกันปีก่อน / ม.ค.–เดือนที่เลือก เทียบปีก่อน · ไม่แสดงเมื่อไม่มีข้อมูลฐานหรือเดือนไม่ครบ · ⚠ เมื่อช่วงที่เทียบมีเดือนที่ไม่มีรายได้ กปภ. (หน้าแล้ง/สัญญาสิ้นสุด)', 'วันที่ออกเอกสาร'],
     ['เป้ายอดขาย', 'ไม่มีข้อมูลเป้าในระบบ แสดง “ยังไม่กำหนดเป้า”', '–'],
   ];
 

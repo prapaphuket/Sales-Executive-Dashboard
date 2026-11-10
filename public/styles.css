@@ -640,3 +640,7 @@ table.vlines tr.grp td { border-left: 0; }
 .hdr .userbar #who { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hdr .seg button { padding: 4px 10px; }
 @media (max-width: 1600px) { .hdr .userbar #who { display: none; } }
+
+/* ชื่อยาวในตาราง: ตัดด้วย … ชี้เมาส์ดูชื่อเต็ม (title) */
+.trunc{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom;cursor:help}
+td.area{max-width:260px;width:260px}

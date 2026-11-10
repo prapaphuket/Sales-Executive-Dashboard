@@ -37,10 +37,10 @@ select json_build_object('ds', 'usage_compare',
   'status', (select json_agg(json_build_array(coalesce(b.name, 'ไม่ระบุ'), k, n, q0, q1) order by b.name, k) from
              (select branch_id, k, count(*) n, round(sum(q0)) q0, round(sum(q1)) q1 from cls where k is not null group by 1, 2) s left join branches b on b.id = s.branch_id),
   'decl_cols', json_build_array('reg', 'name', 'br', 'ty', 'q0', 'q1'),
-  'decl', (select json_agg(json_build_array(d.reg, case when d.personal_type = 'company' or d.ty in ('T3') then nm.customer_name else 'บุคคลธรรมดา' end, coalesce(b.name, 'ไม่ระบุ'), coalesce(d.ty, '?'), round(d.q0), round(d.q1)) order by d.q1 - d.q0)
+  'decl', (select json_agg(json_build_array(d.reg, coalesce(nm.customer_name, '–'), coalesce(b.name, 'ไม่ระบุ'), coalesce(d.ty, '?'), round(d.q0), round(d.q1)) order by d.q1 - d.q0)
            from (select * from cls where k in ('down', 'stop') order by q1 - q0 limit 20) d left join nm on nm.cw = d.id left join branches b on b.id = d.branch_id),
   'monthly_cols', json_build_array('m', 'br', 'q_exist', 'q_excl_pwa', 'q_all'),
   'monthly', (select json_agg(json_build_array(m, br, round(q_exist), round(q_excl_pwa), round(q_all)) order by m, br) from monthly),
   'audit_cols', json_build_array('reg', 'name', 'br', 'status', 'ty', 'last_bill', 'issue'),
-  'audit', (select json_agg(json_build_array(a.reg, case when a.personal_type = 'company' or a.ty in ('T2.2', 'T2.3', 'T3', 'T3.1') then nm.customer_name else 'บุคคลธรรมดา' end, coalesce(b.name, 'ไม่ระบุ'), a.status, coalesce(a.ty, '?'), to_char(a.lb, 'YYYY-MM-DD'), a.issue) order by a.issue, b.name, a.reg)
+  'audit', (select json_agg(json_build_array(a.reg, coalesce(nm.customer_name, '–'), coalesce(b.name, 'ไม่ระบุ'), a.status, coalesce(a.ty, '?'), to_char(a.lb, 'YYYY-MM-DD'), a.issue) order by a.issue, b.name, a.reg)
             from audit a left join nm on nm.cw = a.id left join branches b on b.id = a.branch_id where a.issue is not null and b.status = 'active'));

@@ -1,5 +1,5 @@
 -- 04_top_customers : ลูกค้าตามยอดขายสุทธิ 12 เดือนล่าสุดที่ครบเดือน เทียบ 12 เดือนก่อนหน้า + หนี้เกินกำหนด ณ วันอ้างอิง
--- ชื่อแสดงเฉพาะนิติบุคคล (personal_type = company) หรือหน่วยงาน/ลูกค้ากลุ่ม T2.2 T2.3 T3 T3.1; บุคคลธรรมดาแสดงเป็นเลขทะเบียน
+-- ชื่อลูกค้าแสดงเต็ม (ลูกค้ายินยอมเปิดเผยชื่อตอนสมัครใช้น้ำ) · ไม่แสดงเลขบัตร โทร ที่อยู่
 with big as (select unnest(array[4, 2438, 1363]) cw),
 p as (select date_trunc('month', $2::date)::date - interval '12 months' a1, date_trunc('month', $2::date)::date - interval '1 day' a2,
              date_trunc('month', $2::date)::date - interval '24 months' b1, date_trunc('month', $2::date)::date - interval '12 months' - interval '1 day' b2),
@@ -29,7 +29,7 @@ select json_build_object('ds', 'top_customers',
   'top10_net', (select round(sum(net), 2) from ranked where rk <= 10), 'top20_net', (select round(sum(net), 2) from ranked where rk <= 20),
   'cols', json_build_array('rk','cw','reg','name','br','ty','net','prev','units','ar','overdue','status'),
   'rows', (select json_agg(json_build_array(r.rk, r.cw, c.registration_number,
-            case when c.personal_type = 'company' or split_part(t.name, ' - ', 1) in ('T2.2','T2.3','T3','T3.1') then nm.customer_name else 'บุคคลธรรมดา' end,
+            coalesce(nm.customer_name, '–'),
             coalesce(b.name, 'ไม่ระบุ'), coalesce(split_part(t.name, ' - ', 1), '?'), round(r.net, 2), round(r.prev, 2), round(r.units, 0),
             round(coalesce(ar.ar, 0), 2), round(coalesce(ar.overdue, 0), 2), c.status) order by r.rk)
            from ranked r left join vw_dash_customer_waters c on c.id = r.cw left join customer_water_types t on t.id = c.type_id

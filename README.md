@@ -38,7 +38,7 @@ SNAPSHOT=1 PORT=8080 npm start
 ### โหมดสด (LIVE)
 
 1. ใช้ role อ่านอย่างเดียว (`mcp_reader`) ที่มีสิทธิ์ SELECT บน `record_invoices`, `record_bills`, `bill_fees`, `branches`, `customer_water_types`
-   และ views ใน `migrations/001_dash_views_pdpa.sql` (ตัดข้อมูลส่วนบุคคลตาม PDPA — ต้องรันซ้ำหลัง restore ทุกครั้ง)
+   และ views ใน `migrations/001_dash_views_pdpa.sql` (ตัดเลขบัตร โทร ที่อยู่ออก) และสิทธิ์ใน `migrations/002_grant_meter_areas.sql` (ชื่อพื้นที่อ่านมาตร) — ต้องรันซ้ำหลัง restore ทุกครั้ง
 2. ตั้งค่า environment variables ฝั่ง server (ดู `.env.example`) — **ห้ามใส่รหัสผ่านในไฟล์ที่ commit**
    ```bash
    export PGHOST=127.0.0.1 PGPORT=5432 PGDATABASE=hea_uat PGUSER=mcp_reader
@@ -85,7 +85,7 @@ screenshots/          ภาพหน้าจอทุกหน้า
 - ไม่มีรหัสผ่านหรือ connection string ใน frontend หรือ source code
 - ไม่มี INSERT/UPDATE/DELETE/DDL ใด ๆ ใน `sql/`
 - ไม่เรียกบริการภายนอก: ฟอนต์ ไลบรารีกราฟ MSAL และโลโก้อยู่ในโฟลเดอร์ `public/` ทั้งหมด (เว็บ static ติดต่อเฉพาะ login.microsoftonline.com และ graph.microsoft.com เพื่อเข้าสู่ระบบ/ดึงกุญแจ)
-- ชื่อบุคคลธรรมดาถูกแทนด้วย “บุคคลธรรมดา” ตั้งแต่ระดับ SQL · ไม่แสดงที่อยู่ เบอร์โทร เลขประจำตัว
+- แสดงชื่อลูกค้าเต็ม (ลูกค้ายินยอมเปิดเผยชื่อตอนสมัครใช้น้ำ) · ยังไม่แสดงที่อยู่ เบอร์โทร เลขประจำตัว
 - ตารางทะเบียนผู้ใช้น้ำอ่านผ่าน view `vw_dash_customer_waters` ที่ไม่มีข้อมูลส่วนบุคคล
 
 ## เอกสารเพิ่มเติม

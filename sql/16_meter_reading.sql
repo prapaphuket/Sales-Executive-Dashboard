@@ -5,6 +5,7 @@
 --   อ่านแล้ว   = ทะเบียนข้างต้นที่มีรายการจดในรอบ (ไม่ยกเลิก) นับ 1 ครั้งต่อทะเบียน
 --   ผิดปกติ   = meter_wrong_show 2 (เกิน 200% ของเฉลี่ย 3 เดือน) / 3 (ต่ำกว่า 20%)
 --   หน่วยผิดปกติ 20 รายแรก เรียงตามผลต่างจากค่าเฉลี่ย 3 เดือน (ลบ.ม.) มากไปน้อย
+--   ชื่อพื้นที่ = meter_reading_areas.title
 -- $1 = วันแรกของช่วงประวัติ, $2 = วันอ้างอิง
 with rec as (
   select r.*, date_trunc('month', r.resp_date)::date rnd
@@ -49,7 +50,7 @@ select json_build_object(
             from (select record_date::date d, count(*) n from rd join cw on cw.id = rd.customer_water_id and cw.status = 'active' group by 1) x),
   'pending_cols', json_build_array('reg', 'name', 'br', 'ty', 'area', 'staff', 'last'),
   'pending', (select json_agg(json_build_array(cw.reg,
-                case when cw.personal_type = 'company' or cw.ty in ('T2.2','T2.3','T3','T3.1') then nm.customer_name else 'บุคคลธรรมดา' end,
+                coalesce(nm.customer_name, '–'),
                 coalesce(b.name, 'ไม่ระบุ'), coalesce(cw.ty, '?'), cw.area, s.sn,
                 (select to_char(max(record_date), 'YYYY-MM-DD') from water_meter_records x where x.customer_water_id = cw.id and x.status <> 'cancelled')) order by cw.reg)
               from cw left join rd on rd.customer_water_id = cw.id left join nm on nm.cw = cw.id left join branches b on b.id = cw.branch_id
@@ -62,6 +63,8 @@ select json_build_object(
                          count(rd.id) filter (where rd.id in (select wid from inv)) n_inv
                   from cw left join rd on rd.customer_water_id = cw.id left join branches b on b.id = cw.branch_id
                   where cw.status in ('active', 'disconnected') group by cw.area) x where n_all > 0),
+  -- ชื่อพื้นที่การอ่านมาตร (ต้อง GRANT SELECT ON meter_reading_areas TO mcp_reader — migrations/002)
+  'area_names', (select json_object_agg(id, trim(title)) from meter_reading_areas where deleted_at is null),
   'staff_cols', json_build_array('staff', 'areas', 'assigned', 'read'),
   'staff', (select json_agg(json_build_array(sn, areas, assigned, nread) order by nread desc)
             from (select s.sn, count(distinct cw.area) areas,
@@ -72,7 +75,7 @@ select json_build_object(
   'wrong_cols', json_build_array('reg', 'name', 'ty', 'date', 'prev', 'cur', 'units', 'avg3', 'pct'),
   'wrong', (select json_agg(json_build_array(reg, name, ty, d, pu, cu, su, avg3, pct) order by sev desc)
             from (select cw.reg,
-                         case when cw.personal_type = 'company' or cw.ty in ('T2.2','T2.3','T3','T3.1') then nm.customer_name else 'บุคคลธรรมดา' end name,
+                         coalesce(nm.customer_name, '–') name,
                          cw.ty, to_char(rd.record_date, 'YYYY-MM-DD') d, rd.previous_unit pu, rd.current_unit cu, rd.sum_unit su,
                          case when rd.meter_wrong_show_percent > 0 then round(nullif(rd.sum_unit, '')::numeric * 100 / rd.meter_wrong_show_percent, 0) end avg3,
                          rd.meter_wrong_show_percent pct,

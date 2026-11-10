@@ -26,7 +26,7 @@ select json_build_object('ds', 'declines',
   'n_match', (select count(*) from agg where prev >= 15000 and cur <= prev * 0.7),
   'cols', json_build_array('cw','reg','name','br','ty','cur','prev','ucur','uprev','status'),
   'rows', (select json_agg(json_build_array(s.cw, c.registration_number,
-            case when c.personal_type = 'company' or split_part(t.name, ' - ', 1) in ('T2.2','T2.3','T3','T3.1') then nm.customer_name else 'บุคคลธรรมดา' end,
+            coalesce(nm.customer_name, '–'),
             coalesce(b.name, 'ไม่ระบุ'), coalesce(split_part(t.name, ' - ', 1), '?'), round(s.cur, 2), round(s.prev, 2), round(s.ucur, 0), round(s.uprev, 0), c.status)
             order by s.prev - s.cur desc)
            from sel s left join vw_dash_customer_waters c on c.id = s.cw left join customer_water_types t on t.id = c.type_id
