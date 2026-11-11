@@ -37,7 +37,7 @@
   const MORGAN_TXT = 'ยังไม่รวมหมู่บ้านมอร์แกน (AR00C-03022) — ใช้น้ำจริง จดหน่วยไว้นอกระบบ ยังไม่ได้ลงใน WMS';
   const TY_NAME = { T1: 'T1', T2: 'T2', 'T2.1': 'T2.1 ตำรวจภูธรภาค 8', 'T2.2': 'T2.2 กปภ.', 'T2.3': 'T2.3 อบต. (หอถังสูง)', T3: 'T3', 'T3.1': 'T3.1 ทอท.', 'ชั่วคราว-ไม้ขาว': 'ชั่วคราว', '?': 'ไม่ระบุ/รอตรวจสอบ' };
   // qr = ลูกค้าสแกน QR บนใบแจ้งหนี้ จ่ายผ่านแอปธนาคาร (ระบบบันทึกใบเสร็จเอง) · ยืนยัน 11/11/69
-  const CH_NAME = { qr: 'สแกน QR (แอปธนาคาร)', epay: 'E-Payment', transfer: 'โอน', direct: 'ชำระตรง (พนักงานบันทึก)', cash: 'เงินสด', cheque: 'เช็ค', scan: 'สแกน QR', '?': 'ไม่ระบุ' };
+  const CH_NAME = { qr: 'สแกน QR (แอปธนาคาร)', epay: 'E-Payment', transfer: 'โอน', direct: 'ชำระตรง (พนักงานบันทึก)', cash: 'เงินสด', cheque: 'เช็ค', scan: 'สแกน QR', zero: 'ไม่มีการชำระ (ยอด 0)', '?': 'ไม่ระบุ' };
   const KIND_NAME = { water: 'ค่าน้ำ', water_legacy: 'ค่าน้ำ', fee: 'งานขาย/บริการ', bond: 'เงินประกัน' };
 
   // ---------- format ----------
@@ -1017,7 +1017,7 @@
       </div>
       <div class="row">
         ${card('c-ar', 'อายุลูกหนี้ ณ ' + dLabel(S.asof), 'บาท รวม VAT · ค่าน้ำตามวันครบกำหนด · ใบแจ้งหนี้งานขายไม่มีวันครบกำหนดในข้อมูล จึงแยกเป็น “ไม่มีวันครบกำหนด”', 'สาขา (ตำบล) · ประเภทลูกค้า · วันอ้างอิงลูกหนี้', '<div id="ar-br"></div><div id="t-ar"></div>', { csv: 1, table: 1, w: 1.2, min: 600 })}
-        ${card('c-ch', 'ช่องทางรับชำระ', 'ใบเสร็จระบบเดิม (ก่อน มี.ค. 69) บันทึกช่องทางไม่ครบ ส่วนใหญ่แสดงเป็น “โอน” · ใบเสร็จยอด 0 = หักด้วยใบลดหนี้ทั้งใบ', 'ช่วงเดือน · สาขา', '<div id="t-ch"></div>', { csv: 1, w: 1, min: 460, foot: '<span id="ch-foot"></span>' })}
+        ${card('c-ch', 'ช่องทางรับชำระ', 'สัดส่วนการจ่าย = % ของจำนวนใบเสร็จ (ช่องทางที่ลูกค้านิยม) · สแกน QR = สแกนบนใบแจ้งหนี้ผ่านแอปธนาคาร · ใบเสร็จระบบเดิม (ก่อน มี.ค. 69) บันทึกช่องทางไม่ครบ ส่วนใหญ่แสดงเป็น “โอน” · ไม่มีการชำระ = ใบเสร็จยอด 0 (ใช้น้ำไม่เกินโควตาน้ำฟรี หรือหักด้วยใบลดหนี้ทั้งใบ) ใน WMS บันทึกเป็นเงินสด', 'ช่วงเดือน · สาขา', '<div id="t-ch"></div>', { csv: 1, w: 1, min: 460, foot: '<span id="ch-foot"></span>' })}
       </div>
       <div class="row">
         ${card('c-cohort', 'อัตราเก็บเงินรายรุ่นใบแจ้งหนี้ (ระบบใหม่ ตั้งแต่ มี.ค. 69)', `ชำระแล้ว ÷ ยอดแจ้งหนี้ของรุ่นเดียวกัน นับรับชำระถึง ${dLabel(S.asof)} · ตรงเวลา = ชำระภายในวันครบกำหนด`, 'ช่วงเดือน (เดือนออกใบแจ้งหนี้) · สาขา (ตำบล) · วันอ้างอิง', '<div id="t-cohort"></div>', { csv: 1, foot: '<span id="co-foot"></span>',
@@ -1056,16 +1056,22 @@
     const badCo = crows.filter((r) => !notDue(r.m) && r.billed && r.paid / r.billed < 0.8).sort((a, b) => a.paid / a.billed - b.paid / b.billed);
     if ($('co-foot')) $('co-foot').innerHTML = badCo.length ? badCo.slice(0, 2).map((r) => `รุ่น ${mLabel(r.m)} เก็บได้แค่ <b class="v-bad">${pct(r.paid / r.billed)}</b> ทั้งที่เลยกำหนดมาแล้ว — ค้าง ${mb(r.open)} ล้านบาท`).join(' · ') : 'ทุกรุ่นที่ครบกำหนดแล้วเก็บได้ตั้งแต่ 80% ขึ้นไป';
 
-    const chm = {}; S.coll.filter((r) => inR(r.m, from, to) && okBr(r.br)).forEach((r) => { const x = chm[r.ch] || (chm[r.ch] = { ch: r.ch, n: 0, amt: 0, z: 0 }); x.n += r.n; x.amt += r.amt; x.z += r.zero_n; });
-    const chrows = Object.values(chm).sort((a, b) => b.amt - a.amt);
-    const chMx = Math.max(0, ...chrows.map((r) => r.amt));
+    // ใบเสร็จยอด 0 (น้ำฟรี/หักใบลดหนี้ทั้งใบ) แยกเป็นแถวของตัวเอง — WMS บังคับเลือกช่องทาง พนักงานจึงบันทึกเป็น "เงินสด" (พบ 11/11/69)
+    const chm = {}; const chAdd = (ch, n, amt) => { if (!n && !amt) return; const x = chm[ch] || (chm[ch] = { ch, n: 0, amt: 0 }); x.n += n; x.amt += amt; };
+    S.coll.filter((r) => inR(r.m, from, to) && okBr(r.br)).forEach((r) => { chAdd(r.ch, r.n - (r.zero_n || 0), r.amt); chAdd('zero', r.zero_n || 0, 0); });
+    // เรียงตามจำนวนใบเสร็จ = ช่องทางที่ลูกค้านิยม (นับครั้งที่จ่าย) · ยอดเงินแยกอีกคอลัมน์ เพราะลูกค้ารายใหญ่จ่ายด้วยโอน/เช็คไม่กี่ใบแต่ยอดสูง
+    const chrows = Object.values(chm).sort((a, b) => b.n - a.n || b.amt - a.amt);
+    const chNMx = Math.max(0, ...chrows.map((r) => r.n)), chNt = sum(chrows, (r) => r.n);
     $('t-ch').innerHTML = table([
-      { h: 'ช่องทาง', f: (r) => esc(CH_NAME[r.ch] || r.ch) },
-      { h: 'ยอด (ล้านบาท)', cls: 'bar-cell', f: (r) => barCell(`<b>${mb(r.amt)}</b> <span class="muted">${pct(coll.total ? r.amt / coll.total : null)}</span>`, r.amt, chMx), v: (r) => round2(r.amt) },
-      { h: 'ใบเสร็จ', n: 1, f: (r) => int(r.n) }, { h: 'ยอด 0', n: 1, f: (r) => int(r.z) },
-    ], chrows, ['รวม', { h: `${mb(coll.total)} 100%`, v: round2(coll.total) }, int(coll.n), int(coll.zero)]);
-    const chN = chrows.slice().sort((a, b) => b.n - a.n)[0], chZ = chrows.slice().sort((a, b) => b.z - a.z)[0];
-    if ($('ch-foot') && chN) $('ch-foot').innerHTML = `${esc(CH_NAME[chN.ch] || chN.ch)} มีใบเสร็จมากที่สุด (${int(chN.n)} ใบ) เฉลี่ย ${int(chN.amt / Math.max(1, chN.n))} บาท/ใบ${chZ && chZ.z ? ` · ${esc(CH_NAME[chZ.ch] || chZ.ch)} มีใบยอด 0 มากสุด ${int(chZ.z)} ใบ` : ''}`;
+      { h: 'ช่องทาง', f: (r) => esc((CH_NAME[r.ch] || r.ch).replace(' (แอปธนาคาร)', '').replace(' (พนักงานบันทึก)', '')), v: (r) => CH_NAME[r.ch] || r.ch },
+      { h: 'สัดส่วนการจ่าย', cls: 'bar-cell', f: (r) => barCell(`<b>${pct(chNt ? r.n / chNt : null)}</b>`, r.n, chNMx), v: (r) => (chNt ? round2(r.n / chNt * 100) : '') },
+      { h: 'ใบเสร็จ', n: 1, f: (r) => int(r.n) },
+      { h: 'ยอด (ล้าน)', n: 1, f: (r) => `<b>${mb(r.amt)}</b>`, v: (r) => round2(r.amt) },
+      { h: '% ยอด', n: 1, cls: 'muted', f: (r) => pct(coll.total ? r.amt / coll.total : null) },
+      { h: 'บาท/ใบ', n: 1, cls: 'muted', f: (r) => int(r.amt / Math.max(1, r.n)) },
+    ], chrows, ['รวม', '100%', int(coll.n), { h: mb(coll.total), v: round2(coll.total) }, '100%', int(coll.total / Math.max(1, coll.n))]);
+    const chN = chrows[0], chA = chrows.slice().sort((a, b) => b.amt - a.amt)[0];
+    if ($('ch-foot') && chN) $('ch-foot').innerHTML = `ลูกค้านิยมจ่ายผ่าน <b>${esc(CH_NAME[chN.ch] || chN.ch)}</b> มากที่สุด ${pct(chNt ? chN.n / chNt : null)} ของการจ่าย (${int(chN.n)} ใบ เฉลี่ย ${int(chN.amt / Math.max(1, chN.n))} บาท/ใบ)${chA && chA !== chN ? ` · ยอดเงินมาจาก${esc(CH_NAME[chA.ch] || chA.ch)}มากที่สุด ${pct(coll.total ? chA.amt / coll.total : null)} (ลูกค้ารายใหญ่)` : ''}${chm.zero ? ` · ใบเสร็จยอด 0 บาท ${int(chm.zero.n)} ใบ (ส่วนใหญ่ใช้น้ำไม่เกินโควตาน้ำฟรี) แยกเป็นแถว “ไม่มีการชำระ” ไม่นับเป็นเงินสด` : ''}`;
 
     const arRows = AGING.map((g) => ({ g, amt: ar.b[g.k], n: sum(ar.rows.filter((r) => r.bk === g.k), (r) => r.n), leg: sum(ar.rows.filter((r) => r.bk === g.k && r.legacy), (r) => r.amt) }));
     $('t-ar').innerHTML = table([
