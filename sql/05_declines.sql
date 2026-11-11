@@ -19,7 +19,9 @@ s as (
   where coalesce(n.status, '') <> 'cancelled' and (n.issue_date between p.a1 and p.a2 or n.issue_date between p.b1 and p.b2)),
 agg as (select s.cw, coalesce(sum(net) filter (where d >= p.a1), 0) cur, coalesce(sum(net) filter (where d <= p.b2), 0) prev,
                coalesce(sum(units) filter (where d >= p.a1), 0) ucur, coalesce(sum(units) filter (where d <= p.b2), 0) uprev from s, p group by s.cw),
-nm as (select distinct on (customer_water_id) customer_water_id cw, customer_name from record_invoices where status <> 'cancelled' order by customer_water_id, issue_date desc, id desc),
+-- ชื่อ: ใบแจ้งหนี้ล่าสุด → ถ้ายังไม่เคยมีบิลใช้ชื่อในทะเบียน customer_waters.name (อ่านเฉพาะ id, name)
+nm as (select w.id cw, coalesce(i.customer_name, nullif(trim(w.name), '')) customer_name from customer_waters w
+       left join (select distinct on (customer_water_id) customer_water_id, customer_name from record_invoices where status <> 'cancelled' order by customer_water_id, issue_date desc, id desc) i on i.customer_water_id = w.id),
 sel as (select * from agg where prev >= 15000 and cur <= prev * 0.7 order by prev - cur desc limit 20)
 select json_build_object('ds', 'declines',
   'window', (select json_build_array(to_char(a1, 'YYYY-MM-DD'), to_char(a2, 'YYYY-MM-DD'), to_char(b1, 'YYYY-MM-DD'), to_char(b2, 'YYYY-MM-DD')) from p),

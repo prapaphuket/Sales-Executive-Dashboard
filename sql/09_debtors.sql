@@ -6,7 +6,9 @@ agg as (select customer_water_id cw, count(*) n, sum(total) ar, sum(total) filte
                sum(total) filter (where $2::date - due_date between 61 and 90) b3, sum(total) filter (where $2::date - due_date > 90) b4
         from pend group by 1),
 top as (select * from agg where overdue > 0 order by overdue desc limit 25),
-nm as (select distinct on (customer_water_id) customer_water_id cw, customer_name from record_invoices where status <> 'cancelled' order by customer_water_id, issue_date desc, id desc)
+-- ชื่อ: ใบแจ้งหนี้ล่าสุด → ถ้ายังไม่เคยมีบิลใช้ชื่อในทะเบียน customer_waters.name (อ่านเฉพาะ id, name)
+nm as (select w.id cw, coalesce(i.customer_name, nullif(trim(w.name), '')) customer_name from customer_waters w
+       left join (select distinct on (customer_water_id) customer_water_id, customer_name from record_invoices where status <> 'cancelled' order by customer_water_id, issue_date desc, id desc) i on i.customer_water_id = w.id)
 select json_build_object('ds', 'debtors', 'asof', to_char($2::date, 'YYYY-MM-DD'),
   'n_overdue_cust', (select count(*) from agg where overdue > 0),
   'cols', json_build_array('cw','reg','name','br','ty','status','n','ar','overdue','oldest','b1','b2','b3','b4'),

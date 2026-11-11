@@ -15,7 +15,9 @@ with rec as (
 cur as (select max(rnd) rnd from rec),
 cw as (select c.id, c.registration_number reg, c.personal_type, c.status, c.branch_id, c.meter_reading_area_id area, split_part(t.name, ' - ', 1) ty
        from vw_dash_customer_waters c left join customer_water_types t on t.id = c.type_id),
-nm as (select distinct on (customer_water_id) customer_water_id cw, customer_name from record_invoices where status <> 'cancelled' order by customer_water_id, issue_date desc, id desc),
+-- ชื่อ: ใบแจ้งหนี้ล่าสุด → ถ้ายังไม่เคยมีบิลใช้ชื่อในทะเบียน customer_waters.name (อ่านเฉพาะ id, name)
+nm as (select w.id cw, coalesce(i.customer_name, nullif(trim(w.name), '')) customer_name from customer_waters w
+       left join (select distinct on (customer_water_id) customer_water_id, customer_name from record_invoices where status <> 'cancelled' order by customer_water_id, issue_date desc, id desc) i on i.customer_water_id = w.id),
 -- ชื่อพนักงาน: ตัดคำนำหน้า แสดงชื่อ + อักษรแรกของนามสกุล (ข้อมูลภายใน ใช้เท่าที่จำเป็น)
 staff as (select distinct on (user_id) user_id, regexp_replace(regexp_replace(coalesce(user_name, ''), '^(นาย|นางสาว|นาง)\s*', ''), '^(\S+)\s+(\S).*$', '\1 \2.') sn
           from water_meter_records where user_id is not null order by user_id, created_at desc),
@@ -48,11 +50,20 @@ select json_build_object(
   'daily_cols', json_build_array('d', 'n'),
   'daily', (select json_agg(json_build_array(to_char(d, 'YYYY-MM-DD'), n) order by d)
             from (select record_date::date d, count(*) n from rd join cw on cw.id = rd.customer_water_id and cw.status = 'active' group by 1) x),
-  'pending_cols', json_build_array('reg', 'name', 'br', 'ty', 'area', 'staff', 'last'),
+  -- inst = วันติดตั้งมาตรล่าสุด (water_meter_assignments.installed_at, action_type = install) · regd = วันลงทะเบียน
+  -- binv = ใบแจ้งหนี้ค่าน้ำที่ออกในเดือนของรอบ (ไม่ยกเลิก; รวมแบบฟอร์มลูกค้าสัญญาใน bill_invoice_fees) แม้ไม่มีรายการจด
+  -- ncx / lcx = จำนวนและวันที่ล่าสุดของใบแจ้งหนี้ที่ถูกยกเลิก
+  'pending_cols', json_build_array('reg', 'name', 'br', 'ty', 'area', 'staff', 'last', 'inst', 'regd', 'binv', 'ncx', 'lcx'),
   'pending', (select json_agg(json_build_array(cw.reg,
                 coalesce(nm.customer_name, '–'),
                 coalesce(b.name, 'ไม่ระบุ'), coalesce(cw.ty, '?'), cw.area, s.sn,
-                (select to_char(max(record_date), 'YYYY-MM-DD') from water_meter_records x where x.customer_water_id = cw.id and x.status <> 'cancelled')) order by cw.reg)
+                (select to_char(max(record_date), 'YYYY-MM-DD') from water_meter_records x where x.customer_water_id = cw.id and x.status <> 'cancelled'),
+                (select to_char(max(wa.installed_at), 'YYYY-MM-DD') from water_meter_assignments wa where wa.customer_water_id = cw.id and wa.action_type = 'install'),
+                (select to_char(v.created_at, 'YYYY-MM-DD') from vw_dash_customer_waters v where v.id = cw.id),
+                (select to_char(max(z.d), 'YYYY-MM-DD') from (select i.issue_date d from record_invoices i, cur where i.customer_water_id = cw.id and i.status <> 'cancelled' and date_trunc('month', i.issue_date) = cur.rnd
+                   union all select f.bill_date from bill_invoice_fees f, cur where f.customer_water_id = cw.id and f.status = 'active' and f.invoice_number not like 'BL%' and date_trunc('month', f.bill_date) = cur.rnd) z),
+                (select count(*) from record_invoices i where i.customer_water_id = cw.id and i.status = 'cancelled'),
+                (select to_char(max(i.issue_date), 'YYYY-MM-DD') from record_invoices i where i.customer_water_id = cw.id and i.status = 'cancelled')) order by cw.reg)
               from cw left join rd on rd.customer_water_id = cw.id left join nm on nm.cw = cw.id left join branches b on b.id = cw.branch_id
                    left join prev_rd p on p.customer_water_id = cw.id left join staff s on s.user_id = p.user_id
               where cw.status = 'active' and rd.id is null),

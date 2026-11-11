@@ -15,8 +15,8 @@ Dashboard 4 หน้าหลัก + 1 หน้าคุณภาพข้อ
 ## สถานะการเชื่อมต่อ (สำคัญ)
 
 ชุดที่ส่งมอบนี้ **ยังไม่ได้เชื่อมต่อฐานข้อมูลสด** หน้าจอทำงานในโหมด `SNAPSHOT` (มีป้ายกำกับบนหัวหน้าจอ)
-ข้อมูลใน `data/*.json` ดึงจากฐาน `hea_uat` (restore จาก prod 4 พ.ย. 2569 00:00) เมื่อ 9 พ.ย. 2569 ผ่าน role `mcp_reader`
-ด้วย SQL ชุดเดียวกับใน `sql/` (พารามิเตอร์ `$1 = 2024-11-01`, `$2 = 2026-11-03`) — ไม่มีข้อมูลจำลอง
+ข้อมูลใน `data/*.json` ดึงจากฐาน `hea_uat` (restore จาก prod 11 พ.ย. 2569 00:00) เมื่อ 11 พ.ย. 2569 ผ่าน role `mcp_reader`
+ด้วย SQL ชุดเดียวกับใน `sql/` (พารามิเตอร์ `$1 = 2024-11-01`, `$2 = 2026-11-10`) — ไม่มีข้อมูลจำลอง
 
 การเปิดโหมดสดต้องติดตั้ง backend บนเครื่องที่เข้าถึงฐานข้อมูลได้ (เช่น Server UAT) ตามขั้นตอนด้านล่าง
 
@@ -38,7 +38,7 @@ SNAPSHOT=1 PORT=8080 npm start
 ### โหมดสด (LIVE)
 
 1. ใช้ role อ่านอย่างเดียว (`mcp_reader`) ที่มีสิทธิ์ SELECT บน `record_invoices`, `record_bills`, `bill_fees`, `branches`, `customer_water_types`
-   และ views ใน `migrations/001_dash_views_pdpa.sql` (ตัดเลขบัตร โทร ที่อยู่ออก) และสิทธิ์ใน `migrations/002_grant_meter_areas.sql` (ชื่อพื้นที่อ่านมาตร) — ต้องรันซ้ำหลัง restore ทุกครั้ง
+   และ views ใน `migrations/001_dash_views_pdpa.sql` (ตัดเลขบัตร โทร ที่อยู่ออก) และสิทธิ์ใน `migrations/002_grant_meter_areas.sql` (ชื่อพื้นที่อ่านมาตร) และ `migrations/003_dash_customer_name.sql` (สิทธิ์อ่านทุกตาราง — ใช้ชื่อลูกค้าและหมู่จากทะเบียน) — ต้องรันซ้ำหลัง restore ทุกครั้ง
 2. ตั้งค่า environment variables ฝั่ง server (ดู `.env.example`) — **ห้ามใส่รหัสผ่านในไฟล์ที่ commit**
    ```bash
    export PGHOST=127.0.0.1 PGPORT=5432 PGDATABASE=hea_uat PGUSER=mcp_reader

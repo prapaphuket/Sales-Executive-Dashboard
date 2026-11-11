@@ -16,7 +16,9 @@ s as (
   union all
   select n.customer_water_id, n.issue_date, -(n.total - n.vat), null, null from vw_dash_credit_notes n, p
   where coalesce(n.status, '') <> 'cancelled' and n.issue_date between p.b1 and p.a2),
-nm as (select distinct on (customer_water_id) customer_water_id cw, customer_name from record_invoices where status <> 'cancelled' order by customer_water_id, issue_date desc, id desc),
+-- ชื่อ: ใบแจ้งหนี้ล่าสุด → ถ้ายังไม่เคยมีบิลใช้ชื่อในทะเบียน customer_waters.name (อ่านเฉพาะ id, name)
+nm as (select w.id cw, coalesce(i.customer_name, nullif(trim(w.name), '')) customer_name from customer_waters w
+       left join (select distinct on (customer_water_id) customer_water_id, customer_name from record_invoices where status <> 'cancelled' order by customer_water_id, issue_date desc, id desc) i on i.customer_water_id = w.id),
 agg as (
   select s.cw, sum(net) filter (where d >= p.a1) net, sum(net) filter (where d < p.a1) prev, sum(units) filter (where d >= p.a1) units
   from s, p group by s.cw),

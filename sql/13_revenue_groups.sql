@@ -2,6 +2,8 @@
 -- $2::date = วันอ้างอิง -> ปีนี้ = ม.ค. ถึงสิ้นเดือนก่อนวันอ้างอิง, ปีก่อน = ช่วงเดียวกันปีก่อน ($1 ไม่ใช้ แต่รับไว้ให้รูปแบบเดียวกับไฟล์อื่น)
 -- หมู่: อ่านจากที่อยู่ในใบแจ้งหนี้ล่าสุดของผู้ใช้น้ำ (ข้อความ "หมู่ที่/หมู่/ม.") ใช้เฉพาะที่อยู่ในตำบลไม้ขาว/สาคู หรือไม่ระบุตำบล นอกนั้น = ไม่ระบุหมู่
 -- src: W = ใบแจ้งหนี้ค่าน้ำ | L = ค่าน้ำลูกค้ารายใหญ่ระบบเดิม (ไม่มีหน่วย) | F = งานขาย/บริการอื่น | C = ใบลดหนี้ (ติดลบ)
+-- หมู่ (ปรับ 11/11/69): ใช้หมู่ + ตำบลในทะเบียน customer_waters (moo, sub_district = ที่ตั้งมาตร) ก่อน
+--       ถ้าทะเบียนไม่ระบุหรืออยู่นอกตำบลไม้ขาว/สาคู จึงอ่านจากที่อยู่ในใบแจ้งหนี้ล่าสุดเหมือนเดิม
 with big as (select unnest(array[4, 2438, 1363]) cw),
 p as (select (date_trunc('month', $2::date) - interval '1 day')::date e1, greatest($1::date, $1::date) dummy),
 w as (select date_trunc('year', e1)::date s1, e1, (date_trunc('year', e1) - interval '1 year')::date s0, (e1 - interval '1 year')::date e0 from p),
@@ -9,8 +11,10 @@ addr as (select distinct on (customer_water_id) customer_water_id cw, customer_a
          where status <> 'cancelled' and customer_water_id is not null order by customer_water_id, issue_date desc, id desc),
 cw as (
   select c.id, split_part(t.name, ' - ', 1) ty,
-         case when m.moo is not null and (m.tb is null or m.tb in ('ไม้ขาว', 'ใม้ขาว', 'สาคู', 'สาคุ')) then 'หมู่ ' || m.moo::int else 'ไม่ระบุหมู่' end moo
+         case when wt.sub_district in ('ไม้ขาว', 'ใม้ขาว', 'สาคู', 'สาคุ') and wt.moo ~ '^\s*\d{1,2}\s*$' then 'หมู่ ' || trim(wt.moo)::int
+              when m.moo is not null and (m.tb is null or m.tb in ('ไม้ขาว', 'ใม้ขาว', 'สาคู', 'สาคุ')) then 'หมู่ ' || m.moo::int else 'ไม่ระบุหมู่' end moo
   from vw_dash_customer_waters c left join customer_water_types t on t.id = c.type_id
+  left join customer_waters wt on wt.id = c.id
   left join lateral (select substring(x.a from '(?:หมู่ที่|หมู่|ม\.)\s*(\d{1,2})') moo, substring(x.a from '(?:ตำบล|ต\.)\s*([ก-๙]+)') tb from addr x where x.cw = c.id) m on true),
 inv as (select distinct on (i.invoice_number, i.customer_water_id, i.issue_date, i.total, i.water_unit) i.*
         from record_invoices i, w where i.status <> 'cancelled' and (i.issue_date between w.s1 and w.e1 or i.issue_date between w.s0 and w.e0)

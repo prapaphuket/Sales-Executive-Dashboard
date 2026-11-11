@@ -395,14 +395,32 @@
   const METER_START = 20, METER_WARN_DAYS = 3;
   function pMeter(el) {
     const D = S.d.meter_reading;
-    if (!D || !D.summary) { setTitle('การจดมาตร'); el.innerHTML = '<div class="state">ยังไม่มีข้อมูลการจดมาตร (ชุดข้อมูล meter_reading)</div>'; return; }
+    if (!D || !D.summary) { setTitle('การจดมาตรและออกใบแจ้งหนี้'); el.innerHTML = '<div class="state">ยังไม่มีข้อมูลการจดมาตร (ชุดข้อมูล meter_reading)</div>'; return; }
     const sm = D.summary, rnd = D.round.slice(0, 7), y = +rnd.slice(0, 4), mo = +rnd.slice(5, 7);
     const eom = new Date(Date.UTC(y, mo, 0)).getUTCDate(), eomD = `${rnd}-${String(eom).padStart(2, '0')}`;
     const ref = S.asof, dayMs = 86400000;
     const delay = Math.round((Date.parse(ref) - Date.parse(eomD)) / dayMs); // + = เลยกำหนด
     const closed = delay > 0, refDay = ref.slice(0, 7) === rnd ? +ref.slice(8, 10) : (closed ? eom : 0);
     const pend = rowsOf({ cols: D.pending_cols, rows: D.pending || [] });
-    const nPend = Math.max(0, sm.reg - sm.read), pctRead = sm.reg ? sm.read / sm.reg : 0;
+    // สาเหตุที่เป็นไปได้ของทะเบียนค้างจด (จากวันติดตั้งมาตร ประเภท และประวัติการจด) — เป็นข้อสังเกต ไม่ใช่ข้อสรุป
+    const startD = `${rnd}-${String(METER_START).padStart(2, '0')}`;
+    const why = (r) => {
+      if (r.inst && r.inst >= startD) return { k: 'new', cls: 'info-line', t: `ติดตั้งมาตร ${dLabel(r.inst)} หลังวันเริ่มจดรอบนี้ (${METER_START} ${TH_M[mo - 1]}) — จะเริ่มจดรอบถัดไป` };
+      if (r.ty === 'T2.2') return { k: 'pwa', cls: 'info-line', t: 'สัญญาขายส่ง กปภ. สิ้นสุดแล้ว — ทะเบียนยังเป็นสถานะใช้งาน' };
+      if (r.binv) return { k: 'billed', cls: 'info-line', t: `ออกใบแจ้งหนี้รอบนี้แล้ว ${dLabel(r.binv)} ตามแบบฟอร์มของสัญญา (ไม่ผ่านการจดมาตรในระบบ)` };
+      if (['T2.3', 'T3.1'].includes(r.ty) && !r.last) return { k: 'contract', cls: 'warn-line', t: `ลูกค้าสัญญา ไม่เคยจดผ่านระบบ และยังไม่มีใบแจ้งหนี้รอบนี้${r.inst ? ` · ติดตั้งมาตร ${dLabel(r.inst)}` : ''}${r.ncx ? ` · ใบแจ้งหนี้ถูกยกเลิก ${int(r.ncx)} ใบ (ล่าสุด ${dLabel(r.lcx)})` : ''} — ควรตรวจสอบ` };
+      if (!r.last) return { k: 'never', cls: 'warn-line', t: `ยังไม่เคยจด${r.inst ? ` ทั้งที่ติดตั้งมาตรตั้งแต่ ${dLabel(r.inst)}` : ` (ลงทะเบียน ${dLabel(r.regd)})`}` };
+      return { k: 'late', cls: '', t: `จดล่าสุด ${dLabel(r.last)}` };
+    };
+    pend.forEach((r) => { r.why = why(r); });
+    // จดหลังบ้าน (มีใบแจ้งหนี้ค่าน้ำในเดือนของรอบตามแบบฟอร์มสัญญา) = นับว่าจดแล้ว และไม่แสดงในรายการค้างจด
+    const back = pend.filter((r) => r.why.k === 'billed');
+    pend.splice(0, pend.length, ...pend.filter((r) => r.why.k !== 'billed'));
+    const nOut = back.length, readN = sm.read + nOut;
+    const nNew = pend.filter((r) => r.why.k === 'new').length;
+    const WHY_L = { new: 'ติดตั้งมาตรหลังวันเริ่มจด', pwa: 'สัญญา กปภ. สิ้นสุด', contract: 'ลูกค้าสัญญาไม่เคยจดผ่านระบบ', never: 'ยังไม่เคยจด', late: 'ค้างจดจากรอบปกติ' };
+    const whySum = Object.entries(WHY_L).map(([k, l]) => [l, pend.filter((r) => r.why.k === k).length]).filter(([, n]) => n).map(([l, n]) => `${l} ${n}`).join(' · ');
+    const nPend = Math.max(0, sm.reg - readN), pctRead = sm.reg ? readN / sm.reg : 0;
     const daysLeft = closed ? 0 : eom - refDay;
     const plan = (d) => (d < METER_START ? 0 : Math.min(1, (d - METER_START + 1) / (eom - METER_START + 1)));
     const pp = (v) => nf1.format(v * 100) + '%';
@@ -411,7 +429,7 @@
       kicker = `รอบ ${mLong(rnd)} · ปิดรอบ ${dLabel(eomD)}`;
       headline = nPend ? `จดครบ ${pp(pctRead)} — เหลือ ${int(nPend)} ทะเบียนที่ยังไม่ได้จด` : `จดครบ 100% ภายในกำหนด`;
       sub = `ออกใบแจ้งหนี้ค่าน้ำแล้ว ${int(sm.inv)} ใบ${sm.read_no_inv ? ` · อ่านแล้วยังไม่มีบิล ${int(sm.read_no_inv)} ราย` : ` · รับรู้รายได้ค่าน้ำเดือน ${TH_M[mo - 1]} แล้ว`}`;
-      badge = nPend ? { cls: 'bad', ic: '!', main: `เลยกำหนด ${delay} วัน`, sub: `${int(nPend)} ราย ยังไม่ได้จด` } : { cls: 'good', ic: '✓', main: 'จดครบ', sub: 'ตามกำหนด' };
+      badge = nPend ? { cls: 'bad', ic: '!', main: `เลยกำหนด ${delay} วัน`, sub: `${int(nPend)} ราย ยังไม่ได้จด${nNew ? ` (ติดตั้งใหม่ ${nNew})` : ''}` } : { cls: 'good', ic: '✓', main: 'จดครบ', sub: 'ตามกำหนด' };
     } else if (refDay < METER_START) {
       kicker = `รอบ ${mLong(rnd)} · วันที่ ${refDay}`; headline = `ยังไม่ถึงวันเริ่มจด — เริ่มวันที่ ${METER_START}`; sub = `ต้องจดครบ ${int(sm.reg)} ทะเบียนภายใน ${dLabel(eomD)}`;
       badge = { cls: 'info', ic: 'i', main: `อีก ${METER_START - refDay} วัน`, sub: 'เริ่มจดมาตร' };
@@ -432,19 +450,19 @@
     const aName = (id) => (id == null ? 'ไม่ระบุพื้นที่' : AN[id] || `พื้นที่ ${id}`);
     const aCell = (id) => `<span class="trunc" title="${esc(aName(id))}">${esc(aName(id))}</span>`;
     const areas = rowsOf({ cols: D.areas_cols, rows: D.areas || [] }), staff = rowsOf({ cols: D.staff_cols, rows: D.staff || [] }), wrong = rowsOf({ cols: D.wrong_cols, rows: D.wrong || [] });
-    setTitle(`การจดมาตรวัดน้ำ · รอบ ${mLong(rnd)}`);
+    setTitle(`การจดมาตรและออกใบแจ้งหนี้ · รอบ ${mLong(rnd)}`);
     setScope(`จาก WMS · รอบ ${dLabel(D.round)} – ${dLabel(eomD)}`);
     el.innerHTML = `
-      <section class="hero" aria-label="สถานะรอบการจดมาตร">
+      <section class="hero" aria-label="สถานะรอบการจดมาตรและออกใบแจ้งหนี้">
         <div class="hero-top"><div class="hero-t"><span class="k">${esc(kicker)}</span><span class="h">${esc(headline)}</span><span class="s">${esc(sub)}</span></div>
           <div class="hero-badge ${badge.cls}"><span class="ic" aria-hidden="true">${badge.ic}</span><div><b>${esc(badge.main)}</b><small>${esc(badge.sub)}</small></div></div></div>
-        <div class="hero-prog"><div class="hp-l"><span>จดแล้ว <b>${int(sm.read)}</b> จาก ${int(sm.reg)} ทะเบียน</span><b>${pp(pctRead)}</b></div>
+        <div class="hero-prog"><div class="hp-l"><span>จดแล้ว <b>${int(readN)}</b> จาก ${int(sm.reg)} ทะเบียน</span><b>${pp(pctRead)}</b></div>
           <div class="hp-bar" role="img" aria-label="จดแล้ว ${pp(pctRead)}"><i style="width:${(pctRead * 100).toFixed(1)}%"></i>${!closed && refDay >= METER_START ? `<s style="left:${(plan(refDay) * 100).toFixed(1)}%" title="แผน ${pp(plan(refDay))}"></s>` : ''}</div></div>
         <div class="hero-tl" aria-label="ไทม์ไลน์รอบการจด"><div class="tl-line"></div><div class="tl-fill" style="width:${Math.min(100, pos(closed ? eom + delay : Math.max(1, refDay))).toFixed(1)}%"></div>
           ${marks.map(([d, t, c], i) => `<div class="tl-m ${c}${i === 0 ? ' first' : ''}${i === 3 && closed && delay > 0 ? ' late' : ''}" style="left:${pos(d).toFixed(1)}%"><span></span><em>${esc(t)}</em></div>`).join('')}</div>
       </section>
       <div class="kpis">
-        ${kpi('จดแล้ว / ทะเบียน', `${int(sm.read)}`, `/ ${int(sm.reg)}`, 'ทะเบียน = ผู้ใช้น้ำสถานะใช้งาน · อ่านแล้ว = มีรายการจดหน่วยน้ำในรอบ (ไม่ยกเลิก) นับ 1 ครั้งต่อทะเบียน', [['ของทะเบียนใช้งาน', pp(pctRead), 'v-mute'], sm.read_inactive ? ['จดทะเบียนที่ไม่ใช่สถานะใช้งาน', int(sm.read_inactive) + ' ราย', 'v-mute'] : null], 'accent')}
+        ${kpi('จดแล้ว / ทะเบียน', `${int(readN)}`, `/ ${int(sm.reg)}`, 'ทะเบียน = ผู้ใช้น้ำสถานะใช้งาน · อ่านแล้ว = มีรายการจดหน่วยน้ำในรอบ (ไม่ยกเลิก) นับ 1 ครั้งต่อทะเบียน + จดหลังบ้าน (ไม่มีรายการจด แต่มีใบแจ้งหนี้ค่าน้ำในเดือนของรอบตามแบบฟอร์มสัญญา)', [['ของทะเบียนใช้งาน', pp(pctRead), 'v-mute'], nOut ? ['จดหลังบ้าน (' + back.map((r) => esc(String(TY_NAME[r.ty] || r.reg).replace(/^T[\d.]+\s*/, ''))).join(', ') + ')', int(nOut) + ' ราย', 'v-mute'] : null, sm.read_inactive ? ['จดทะเบียนที่ไม่ใช่สถานะใช้งาน', int(sm.read_inactive) + ' ราย', 'v-mute'] : null], 'accent')}
         ${kpi('ค้างจด', int(nPend), 'ราย', 'ทะเบียนใช้งานที่ยังไม่มีรายการจดในรอบ', [[closed ? 'ดีเลย์' : 'เหลือ', closed ? `เลยกำหนด ${delay} วัน (ณ ${dLabel(ref)})` : `${daysLeft} วัน`, nPend ? 'v-bad' : 'v-good']], nPend ? 'bad' : '')}
         ${kpi('ออกใบแจ้งหนี้ค่าน้ำ', int(sm.inv), 'ใบ', 'ใบแจ้งหนี้ค่าน้ำที่ออกในเดือนของรอบ (ไม่ยกเลิก)', [['จากการจดในรอบ', int(sm.inv_from_read) + ' ใบ', 'v-mute'], ['อ่านแล้วแต่ยังไม่มีบิล', int(sm.read_no_inv) + ' ราย', sm.read_no_inv ? 'v-bad' : 'v-good']])}
         ${kpi('หน่วยน้ำผิดปกติ', int(sm.wrong), 'ราย', 'อ่านแล้วแต่หน่วยเกิน 200% หรือต่ำกว่า 20% ของค่าเฉลี่ย 3 เดือนก่อน (ตาม WMS)', [['สูงกว่า 200%', int(sm.wrong_hi) + ' ราย', 'v-warn'], ['ต่ำกว่า 20%', int(sm.wrong_lo) + ' ราย', 'v-warn']], '', { vcls: 'v-warn' })}
@@ -455,7 +473,7 @@
             foot: `<span class="pill warn">เหลือ ≤ ${METER_WARN_DAYS} วัน</span> ใกล้ครบกำหนด · <span class="pill down">+N วัน</span> เลยกำหนดแล้ว — ยังออกบิลไม่ได้ รายได้เดือนนี้ไม่ครบ` })}
         ${card('c-mflow', 'จากจดมาตร ถึงรับรู้รายได้', `กระทบยอดใบแจ้งหนี้ค่าน้ำที่ออกในรอบ ${mLabel(rnd)}`, '', `<ol class="ilist mflow">
             <li><span class="no">1</span><div><div class="t1">ทะเบียนใช้งาน</div><div class="d">ผู้ใช้น้ำสถานะใช้งาน ณ วันที่ดึงข้อมูล · งดจ่ายน้ำ ${int(sm.cut)} ราย ไม่นับ</div></div><span class="mv">${int(sm.reg)}</span></li>
-            <li><span class="no">2</span><div><div class="t1">จดมาตรแล้ว</div><div class="d">${dLabel(sm.first_read)} – ${dLabel(sm.last_read)}${sm.read_inactive ? ` · จดทะเบียนที่ไม่ใช่สถานะใช้งานอีก ${int(sm.read_inactive)} ราย` : ''}</div></div><span class="mv">${int(sm.read)}</span></li>
+            <li><span class="no">2</span><div><div class="t1">จดมาตรแล้ว</div><div class="d">${dLabel(sm.first_read)} – ${dLabel(sm.last_read)}${nOut ? ` · รวมจดหลังบ้านตามสัญญา ${int(nOut)} ราย` : ''}${sm.read_inactive ? ` · จดทะเบียนที่ไม่ใช่สถานะใช้งานอีก ${int(sm.read_inactive)} ราย` : ''}</div></div><span class="mv">${int(readN)}</span></li>
             <li><span class="no">3</span><div><div class="t1">ออกใบแจ้งหนี้ค่าน้ำ</div><div class="d">จากการจดในรอบ ${int(sm.inv_from_read)} · ไม่มีการจดในรอบ (สร้างเอง/นำเข้า) ${int(sm.inv_no_read)}</div></div><span class="mv">${int(sm.inv)}</span></li>
           </ol>
           ${sm.read_no_inv ? `<div class="note-box bad"><span class="ic">!</span><div>อ่านแล้วแต่ยังไม่มีใบแจ้งหนี้ <b>${int(sm.read_no_inv)} ราย</b> — ตรวจใน WMS ก่อนปิดเดือน</div></div>`
@@ -475,17 +493,19 @@
         <li>เริ่มจดมาตรวันที่ <b>${METER_START}</b> ของเดือน และต้องจด<b>ครบภายในวันสิ้นเดือน</b> เพื่อออกใบแจ้งหนี้และรับรู้รายได้ในเดือนนั้น</li>
         <li><b>ดีเลย์ (วัน)</b> = วันอ้างอิง − วันสิ้นเดือนของรอบ (บวก = เลยกำหนด) · เหลือ ≤ ${METER_WARN_DAYS} วันแต่ยังค้าง = เหลือง “ใกล้ครบกำหนด” (เกณฑ์ ${METER_WARN_DAYS} วันรอยืนยัน)</li>
         <li><b>ทะเบียน</b> = ผู้ใช้น้ำสถานะใช้งาน (สถานะปัจจุบัน ระบบไม่เก็บประวัติสถานะรายวัน) · <b>อ่านแล้ว</b> = มีรายการจดหน่วยน้ำในรอบ (ไม่ยกเลิก) นับ 1 ครั้งต่อทะเบียน · <b>ค้างอ่าน</b> = ทะเบียน − อ่านแล้ว</li>
+        <li><b>จดหลังบ้าน</b> = ทะเบียนที่ไม่มีรายการจดในระบบ แต่มีใบแจ้งหนี้ค่าน้ำในเดือนของรอบตามแบบฟอร์มสัญญา (เช่น ทอท.) — นับว่าจดแล้ว ไม่แสดงในรายการค้างจด · ตรวจจากใบแจ้งหนี้ทุกเดือน</li>
         <li><b>หน่วยน้ำผิดปกติ</b> = ค่าที่ WMS ตั้งไว้ในรายการจด: เกิน 200% หรือต่ำกว่า 20% ของค่าเฉลี่ย 3 เดือนก่อน</li>
         <li>ตัวเลขอาจต่างจากแผงควบคุมใน WMS ได้เล็กน้อย เพราะดึงจากฐานข้อมูลสำรอง ณ ${dLabel(S.asof)} และใช้สถานะทะเบียน ณ วันที่ดึง</li>
       </ul></section>`;
     // ตารางค้างจด
     $('t-mpend').innerHTML = pend.length ? table([
       { h: 'ทะเบียน', nw: 1, k: 'reg' },
-      { h: 'ชื่อ / ประเภท', cls: 'name', f: (r) => `${esc(r.name || '–')} <span class="muted small">· ${esc(TY_NAME[r.ty] || r.ty)}</span>` + (['T2.2', 'T2.3', 'T3.1'].includes(r.ty) ? '<span class="warn-line">⚠ ลูกค้าสัญญา — ตรวจว่าจดแยก/ออกบิลตามสัญญาหรือไม่</span>' : ''), v: (r) => `${r.name || ''} (${r.ty})` },
+      { h: 'ชื่อ / ประเภท · สาเหตุที่เป็นไปได้', cls: 'name', f: (r) => `${esc(r.name || '–')} <span class="muted small">· ${esc(TY_NAME[r.ty] || r.ty)}</span>` + (r.why.cls ? `<span class="${r.why.cls}">${r.why.cls === 'warn-line' ? '⚠ ' : 'ⓘ '}${esc(r.why.t)}</span>` : `<br><span class="muted small">${esc(r.why.t)}</span>`), v: (r) => `${r.name || ''} (${r.ty}) — ${r.why.t}` },
       { h: 'พื้นที่', cls: 'area', f: (r) => `${aCell(r.area)}<br><span class="muted small">${esc(r.br)}</span>`, v: (r) => `${aName(r.area)} (${r.br})` },
       { h: 'พนักงานที่รับผิดชอบ', f: (r) => (r.staff ? esc(r.staff) : '<span class="muted small">ไม่มีผู้จดรอบก่อน</span>'), v: (r) => r.staff || '' },
-      { h: 'ดีเลย์', nw: 1, f: () => `${sevPill(delay)}<br><span class="muted small">ครบกำหนด ${dLabel(eomD)}</span>`, v: () => delay },
+      { h: 'ดีเลย์', nw: 1, f: (r) => (r.why.k === 'new' ? '<span class="pill na">ติดตั้งใหม่</span>' : r.why.k === 'billed' ? '<span class="pill up">ออกบิลแล้ว</span>' : sevPill(delay)) + `<br><span class="muted small">ครบกำหนด ${dLabel(eomD)}</span>`, v: (r) => (r.why.k === 'new' ? 'ติดตั้งใหม่' : r.why.k === 'billed' ? 'ออกบิลแล้ว' : delay) },
     ], pend) : '<div class="state">จดครบทุกทะเบียนแล้ว</div>';
+    if (pend.length) $('t-mpend').insertAdjacentHTML('afterbegin', `<div class="info-line" style="margin:0 0 10px;font-size:13px;padding:6px 10px">ⓘ <b>สาเหตุที่เป็นไปได้:</b> ${esc(whySum)}</div>`);
     // รายวัน (สะสม)
     const byDay = {}; (D.daily || []).forEach(([d, n]) => { byDay[+d.slice(8, 10)] = n; });
     const dlist = []; let cum = 0; for (let d = METER_START; d <= eom; d++) { cum += byDay[d] || 0; dlist.push({ d, v: sm.reg ? cum / sm.reg : 0, n: byDay[d] || 0 }); }
@@ -527,7 +547,7 @@
     sales: { t: 'ยอดขายและการใช้น้ำ', f: ['from', 'to', 'br', 'ty', 'moo'] },
     customers: { t: 'ลูกค้า', f: ['from', 'to', 'br', 'ty'] },
     collections: { t: 'การจัดเก็บและลูกหนี้', f: ['from', 'to', 'br', 'ty', 'asof'] },
-    meter: { t: 'การจดมาตร', f: [] },
+    meter: { t: 'การจดมาตรและออกใบแจ้งหนี้', f: [] },
   };
   // บรรทัดเล็กใต้ชื่อหน้า: SNAPSHOT · <ขอบเขตของหน้า> · ข้อมูล ณ … · ที่มาของข้อมูล
   const setScope = (t) => { const e = $('page-scope'); if (e) e.textContent = t ? ' ' + t + ' ·' : ''; };
@@ -717,7 +737,7 @@
       </div>
       <div class="row">
         ${card('c-type', 'ยอดขายสุทธิตามประเภทลูกค้า', 'ล้านบาท · ประเภทตามทะเบียนผู้ใช้น้ำปัจจุบัน', 'ช่วงเดือน · สาขา (ตำบล) · ประเภทลูกค้า', '<div id="t-type"></div>', { csv: 1, min: 560 })}
-        ${card('c-moo2', 'ยอดค่าน้ำตามหมู่', 'ล้านบาท · เฉพาะใบแจ้งหนี้ค่าน้ำ (ไม่รวมงานขาย ใบลดหนี้ และลูกค้ารายใหญ่ระบบเดิม) · แต่ละตำบลแสดงเฉพาะหมู่ของตัวเอง', 'ช่วงเดือน · สาขา (ตำบล) · ประเภทลูกค้า · หมู่', '<div id="t-moo2"></div>', { csv: 1, min: 560, foot: 'หมู่อ่านจากที่อยู่ในใบแจ้งหนี้ล่าสุดของผู้ใช้น้ำ · “ไม่ระบุหมู่” = ที่อยู่ไม่มีเลขหมู่หรืออยู่นอกตำบล · ยังไม่ใช้ DMA เพราะการผูก DMA ในทะเบียนยังไม่ครบ' })}
+        ${card('c-moo2', 'ยอดค่าน้ำตามหมู่', 'ล้านบาท · เฉพาะใบแจ้งหนี้ค่าน้ำ (ไม่รวมงานขาย ใบลดหนี้ และลูกค้ารายใหญ่ระบบเดิม) · แต่ละตำบลแสดงเฉพาะหมู่ของตัวเอง', 'ช่วงเดือน · สาขา (ตำบล) · ประเภทลูกค้า · หมู่', '<div id="t-moo2"></div>', { csv: 1, min: 560, foot: 'หมู่ตามทะเบียนผู้ใช้น้ำ (ที่ตั้งมาตร) ถ้าทะเบียนไม่ระบุจึงใช้ที่อยู่ในใบแจ้งหนี้ · “ไม่ระบุหมู่” = ทะเบียนและใบแจ้งหนี้ไม่มีเลขหมู่ในตำบลไม้ขาว/สาคู · ยังไม่ใช้ DMA เพราะการผูก DMA ในทะเบียนยังไม่ครบ' })}
       </div>
       <div class="row">
         ${card('c-top', 'ลูกค้า 15 รายแรกตามยอดขาย 12 เดือนเต็มล่าสุด', `${dLabel(S.d.top_customers.window[0])} – ${dLabel(S.d.top_customers.window[1])} · ล้านบาท · <b>10 รายแรก = ${pct(S.d.top_customers.top10_net / S.d.top_customers.total_net)}</b> ของยอดขายค่าน้ำทุกสาขา (ไม่รวมงานขาย) · คลิกแถวเพื่อดูเอกสารต้นทาง`, 'สาขา (ตำบล) · ประเภทลูกค้า (ช่วงเดือนไม่มีผล)', '<div id="t-top"></div>', { csv: 1 })}
@@ -844,7 +864,7 @@
       $('pipe-sum').innerHTML = `<div class="big3"><div class="b"><div class="l">ค้างทั้งหมด</div><div class="n">${int(P.nOpen)} <small>ราย</small></div></div><div class="b"><div class="l">เกิน 60 วัน</div><div class="n v-bad">${int(P.over60)} <small>ราย</small></div></div><div class="b"><div class="l">ติดตั้งเสร็จเฉลี่ย</div><div class="n">${nf1.format(P.perMonth)} <small>ราย/เดือน</small></div></div></div>
         <div class="pbars">${bySt.map((x) => `<span>${esc(STN[x.k])}</span><span class="pb" role="img" aria-label="${esc(STN[x.k])} ${x.n} ราย เกิน 60 วัน ${x.o} ราย"><i class="ok" style="width:${((x.n - x.o) / mx * 100).toFixed(1)}%"></i><i class="od" style="width:${(x.o / mx * 100).toFixed(1)}%"></i></span><span class="pn"><b>${int(x.n)}</b> <span class="v-bad">(${int(x.o)})</span></span>`).join('')}</div>
         <div class="legend-row"><span><i style="background:var(--ch-br1)"></i>ไม่เกิน 60 วัน</span><span><i style="background:var(--status-bad)"></i>เกิน 60 วัน (ในวงเล็บ)</span></div>
-        <div class="note-box info">${['ไม้ขาว', 'สาคู'].filter((b) => brN(b)).map((b) => `${b} ${int(brN(b))} ราย`).join(' · ')}${res.length ? ` (บ้านพักอาศัยไม้ขาว ${int(sum(res, (r) => r.n))} ราย อายุเฉลี่ย ${int(sum(res, (r) => r.avg_age * r.n) / Math.max(1, sum(res, (r) => r.n)))} วัน)` : ''} · ใช้เวลาติดตั้งเฉลี่ย ${int(P.avgDays)} วัน (6 เดือนล่าสุด) · <a href="#snapshot">ดูสิ่งที่ต้องทำ</a></div>`; }
+        <div class="note-box info">${['ไม้ขาว', 'สาคู'].filter((b) => brN(b)).map((b) => `${b} ${int(brN(b))} ราย`).join(' · ')}${res.length ? ` (บ้านพักอาศัยไม้ขาว ${int(sum(res, (r) => r.n))} ราย อายุเฉลี่ย ${int(sum(res, (r) => r.avg_age * r.n) / Math.max(1, sum(res, (r) => r.n)))} วัน)` : ''} · ใช้เวลาติดตั้งเฉลี่ย ${int(P.avgDays)} วัน (6 เดือนล่าสุด) · <a href="#snapshot">ดูข้อเสนอแนะ</a></div>`; }
     else { $('pipe-sum').innerHTML = '<div class="state">ไม่มีข้อมูลคำร้อง</div>'; $('t-pipe').innerHTML = '<div class="state">ไม่มีข้อมูลคำร้อง</div>'; }
     const ns = [
       { name: 'ลูกค้าใหม่ (ใบแจ้งหนี้แรก)', type: 'bar', barMaxWidth: 26, itemStyle: barStyle(C.navy), data: months.map((m) => sum(S.cust.filter((r) => r.m === m && okBr(r.br) && okTy(r.ty)), (r) => r.new)) },
@@ -1051,7 +1071,7 @@
             <td class="n">${r.g.cat === 'g' && r.c.cust ? int(r.c.net / r.c.cust) + ` <small class="muted">(${r.y.cust ? int(r.y.net / r.y.cust) : '–'})</small>` : '–'}</td>
             <td class="sp-cell">${spark(r.sp)}</td><td>${verdict(r.tr.l3, r.tr.l3y)}</td></tr>`;
     const ar7 = arAgg();
-    const prioL = (p) => (p === 1 ? 'ด่วน' : p === 2 ? 'สำคัญ' : 'วางแผน');
+    const prioL = (p) => (p === 1 ? 'ควรพิจารณาก่อน' : p === 2 ? 'น่าพิจารณา' : 'ระยะยาว');
     const scope = `${S.f.br ? 'ตำบล' + esc(S.f.br) : 'ไม้ขาว + สาคู'}${S.f.ty ? ' · ประเภท ' + esc(TY_NAME[S.f.ty] || S.f.ty) : ''} · ไม่รวม VAT`;
     setTitle(`Executive Snapshot · รายได้ประจำเดือน ${mLong(M)}`);
     $('head-tools').innerHTML = '<button type="button" class="btn" id="snap-print" title="พิมพ์หรือบันทึกเป็น PDF 2 หน้า A4 แนวนอน">พิมพ์ / บันทึก PDF (2 หน้า)</button>';
@@ -1086,7 +1106,7 @@
         </div>
       </section>
       <section class="snap-page">
-        ${ph('แนวโน้ม ฤดูกาล และสิ่งที่ต้องทำ', `${scope} · ข้อมูล ณ ${dLabel(S.asof)}`, 'หน้า 2/2')}
+        ${ph('แนวโน้ม ฤดูกาล และข้อเสนอแนะ', `${scope} · ข้อมูล ณ ${dLabel(S.asof)}`, 'หน้า 2/2')}
         <div class="row" style="margin-top:0">
           ${card('c-snapc', 'รายได้รายเดือนแยกกลุ่ม', `ม.ค. ${+Yp + 543} – ${mLong(M)} · ล้านบาท ไม่รวม VAT · แถบสีอ่อน = ฤดูฝน/นอกฤดูท่องเที่ยว`, 'สาขา (ตำบล)', '<div class="chart snap-chart" id="ch-snap"></div>', { table: 1, w: 2, min: 620 })}
           ${card('c-season', 'ฤดูกาลและภัยแล้ง', `ดัชนีฤดูกาลปี ${seasonY ? +seasonY + 543 : '–'} = รายได้เดือน ÷ ค่าเฉลี่ยทั้งปี (ไม่รวม กปภ.)`, 'สาขา (ตำบล)',
@@ -1095,7 +1115,7 @@
             <div class="note-box"><span class="ic" aria-hidden="true">⚠</span><div><b>ภัยแล้ง พ.ค. ${(+Y + 543) % 100}</b> ไม่มีการส่งน้ำให้ กปภ. และ T3 ลดลงตามฤดูกาล${t3r ? ` (${mm(snapMonth(Y + '-05', ['T3']).net)} ล้าน เทียบ ${mLabel(Y + '-04')} ${mm(snapMonth(Y + '-04', ['T3']).net)} ล้าน)` : ''} — ปีหน้าควรวางแผนกำลังผลิตก่อนรับลูกค้าแทน กปภ.</div></div>`, { w: 1, min: 360 })}
         </div>
         <div class="row">
-          ${card('c-todo', 'สิ่งที่ต้องทำ', 'เรียงตามความด่วน · ผลกระทบประมาณจากข้อมูลจริง · ผู้รับผิดชอบเป็นข้อเสนอ', 'สาขา (ตำบล) · ประเภทลูกค้า',
+          ${card('c-todo', 'ข้อเสนอแนะ', 'เรียงตามผลกระทบ · ตัวเลขประมาณจากข้อมูลจริง · หน่วยงานที่เกี่ยวข้องเป็นข้อเสนอ ให้ผู้บริหารพิจารณา', 'สาขา (ตำบล) · ประเภทลูกค้า',
             `<ol class="acts">${A.map((a, i) => `<li><span class="no">${i + 1}</span><div><div class="t1">${a.t}</div><div class="im">${a.imp}</div></div><div class="rt"><span class="prio p${a.p}">${prioL(a.p)}</span><span>${a.own}</span></div></li>`).join('')}</ol>`, { w: 1.4, min: 520 })}
           ${card('c-trend', 'แนวโน้ม 3 เดือนล่าสุด', 'เทียบช่วงเดียวกันปีก่อน', 'สาขา (ตำบล) · ประเภทลูกค้า',
             `<div class="trend2"><div class="g"><div class="h">▲ ดีขึ้น</div><div class="x">${better.join(' · ') || '–'}</div></div><div class="b"><div class="h">▼ แย่ลง</div><div class="x">${worse.join(' · ') || '–'}</div></div></div>
@@ -1162,28 +1182,28 @@
     const pm = Object.keys(pwaByM).sort().slice(-12), pwaAvg = pm.length ? sum(pm, (m) => pwaByM[m]) / pm.length : 0;
     const lastPwa = Object.keys(pwaByM).sort().pop();
     if (okBr('ไม้ขาว') && (!S.f.ty || S.f.ty === 'T2.2') && lastPwa && lastPwa < S.lastFull)
-      A.push({ p: 1, t: 'ชดเชยรายได้ขายส่ง กปภ. ที่หยุดไป', what: `เจรจาสัญญาขายส่งรอบใหม่ หรือนำน้ำส่วนที่เคยส่ง กปภ. ไปขายลูกค้า T3/โครงการใหม่ตามแนวท่อ (บิลสุดท้าย ${mLabel(lastPwa)})`,
+      A.push({ p: 1, t: 'โอกาสทดแทนรายได้ขายส่ง กปภ. ที่หยุดไป', what: `แนวทางที่เป็นไปได้: เจรจาสัญญาขายส่งรอบใหม่ หรือนำน้ำส่วนที่เคยส่ง กปภ. ไปขายลูกค้า T3/โครงการใหม่ตามแนวท่อ (บิลสุดท้าย ${mLabel(lastPwa)})`,
         imp: `−${mb(pwaAvg * 12)} ล้านบาท/ปี ถ้าไม่ทดแทน`, own: 'ผู้บริหาร + ฝ่ายกลยุทธ์', kpi: 'ลบ.ม./วัน ไม่รวม กปภ. · รายได้ไม่รวม กปภ.', pg: 'revenue' });
     // 2) หนี้
-    if (ar.overdue > 0) A.push({ p: 1, t: 'เร่งเก็บหนี้เกินกำหนด', what: `${debt[0] ? `${esc(debt[0].name)} ค้าง ${mb(debt[0].overdue)} ล้านบาท · ` : ''}หนี้เกิน 90 วัน ${mb(ar.b[4])} ล้านบาท (บางรายงดจ่ายน้ำแล้ว) — ทำแผนติดตามรายราย และพิจารณาตั้งสำรองหนี้ระบบเดิม`,
-      imp: `เงินสดเข้า ${mb(ar.overdue)} ล้านบาท`, own: 'บัญชี/การเงิน', kpi: 'ลูกหนี้เกินกำหนด · อัตราเก็บเงินรายรุ่น', pg: 'collections' });
+    if (ar.overdue > 0) A.push({ p: 1, t: 'โอกาสรับเงินสดจากหนี้เกินกำหนด', what: `${debt[0] ? `${esc(debt[0].name)} ค้าง ${mb(debt[0].overdue)} ล้านบาท · ` : ''}หนี้เกิน 90 วัน ${mb(ar.b[4])} ล้านบาท (บางรายงดจ่ายน้ำแล้ว) — แนวทาง: แผนติดตามรายราย และพิจารณาตั้งสำรองหนี้ระบบเดิม`,
+      imp: `เงินสดที่อาจรับได้ ${mb(ar.overdue)} ล้านบาท`, own: 'บัญชี/การเงิน', kpi: 'ลูกหนี้เกินกำหนด · อัตราเก็บเงินรายรุ่น', pg: 'collections' });
     // 3) ลูกค้าใช้น้ำลดลง
     const U = S.d.usage_compare;
     if (U) { const st = U.status.filter((r) => okBr(r[0])); const down = st.filter((r) => r[1] === 'down' || r[1] === 'stop'); const lost = sum(down, (r) => r[3] - r[4]);
       const g = revAgg(), gY = Number(S.d.revenue_groups.window[1].slice(0, 4)); const gp = ['T1', 'T2', 'T2.1', 'T3'].map((k) => g(k, gY)); const price = sum(gp, (a) => a.wnet) / Math.max(1, sum(gp, (a) => a.units));
-      A.push({ p: 2, t: 'ติดตามลูกค้าที่ใช้น้ำลดลง', what: `${int(sum(down, (r) => r[2]))} รายใช้น้ำลด/หยุดใช้ (4 เดือนล่าสุด) รวม ${int(lost)} ลบ.ม. (มีรายที่ใช้เพิ่มชดเชย +${int(sum(st.filter((r) => r[1] === 'up' || r[1] === 'new'), (r) => r[4] - r[3]))} ลบ.ม.) — ฝ่ายกลยุทธ์เยี่ยม 20 อันดับแรก ตรวจมาตร/รั่ว/แหล่งน้ำทดแทน`,
+      A.push({ p: 2, t: 'ลูกค้าที่ใช้น้ำลดลงน่าติดตาม', what: `${int(sum(down, (r) => r[2]))} รายใช้น้ำลด/หยุดใช้ (4 เดือนล่าสุด) รวม ${int(lost)} ลบ.ม. (มีรายที่ใช้เพิ่มชดเชย +${int(sum(st.filter((r) => r[1] === 'up' || r[1] === 'new'), (r) => r[4] - r[3]))} ลบ.ม.) — แนวทาง: เยี่ยม 20 อันดับแรก ตรวจมาตร/รั่ว/แหล่งน้ำทดแทน`,
         imp: `ราว ${mb(lost * 3 * price)} ล้านบาท/ปี (ที่ ${nf2.format(price)} บาท/ลบ.ม.)`, own: 'ฝ่ายกลยุทธ์/บริการลูกค้า', kpi: 'จำนวนรายที่ลด ≥ 10% · ลบ.ม. ลูกค้าเดิม', pg: 'usage' }); }
     // 4) ติดตั้งมิเตอร์ใหม่
     const P = pipeAgg();
     if (P && P.nOpen) { const g = revAgg(), gY = Number(S.d.revenue_groups.window[1].slice(0, 4)); const gg = ['T1', 'T2', 'T2.1'].map((k) => g(k, gY)); const arpu = sum(gg, (a) => a.net) / Math.max(1, sum(gg, (a) => a.cm));
-      A.push({ p: 2, t: 'เร่งติดตั้งมิเตอร์ลูกค้าใหม่', what: `คำร้องค้าง ${int(P.nOpen)} ราย (เกิน 60 วัน ${int(P.over60)} ราย) ขณะติดตั้งได้เฉลี่ย ${nf1.format(P.perMonth)} ราย/เดือน ใช้เวลา ~${int(P.avgDays)} วัน — ตั้งเป้าเคลียร์งานค้าง และเก็บค่าติดตั้ง`,
+      A.push({ p: 2, t: 'โอกาสรายได้จากคำร้องติดตั้งที่ค้าง', what: `คำร้องค้าง ${int(P.nOpen)} ราย (เกิน 60 วัน ${int(P.over60)} ราย) ขณะติดตั้งได้เฉลี่ย ${nf1.format(P.perMonth)} ราย/เดือน ใช้เวลา ~${int(P.avgDays)} วัน — แนวทาง: ตั้งเป้าเคลียร์งานค้าง และเก็บค่าติดตั้ง`,
         imp: `+${mb(P.nOpen * arpu * 12)} ล้านบาท/ปี ค่าน้ำ (ที่ ${int(arpu)} บาท/ราย/เดือน) + ค่าติดตั้ง`, own: 'ฝ่ายปฏิบัติการ/ช่าง', kpi: 'คำร้องค้าง > 60 วัน · ติดตั้งต่อเดือน', pg: 'customers' }); }
     // 5) อัตราหอถัง
     { const g = revAgg(), gY = Number(S.d.revenue_groups.window[1].slice(0, 4)), h = g('T2.3', gY), mo = Number(S.d.revenue_groups.window[1].slice(5, 7));
-      if (h.units && okBr('ไม้ขาว')) A.push({ p: 3, t: 'ทบทวนอัตราน้ำ อบต.ไม้ขาว (หอถังสูง)', what: `ใช้น้ำ ${int(h.units)} ลบ.ม. ที่ ${nf2.format(h.wnet / h.units)} บาท/ลบ.ม. (ต่ำสุดทุกกลุ่ม) — หยิบเป็นประเด็นในการเจรจา/ทบทวนเงื่อนไขสัญญา`,
+      if (h.units && okBr('ไม้ขาว')) A.push({ p: 3, t: 'อัตราน้ำ อบต.ไม้ขาว (หอถังสูง) ต่ำสุดทุกกลุ่ม', what: `ใช้น้ำ ${int(h.units)} ลบ.ม. ที่ ${nf2.format(h.wnet / h.units)} บาท/ลบ.ม. — อาจใช้เป็นประเด็นเมื่อเจรจา/ทบทวนเงื่อนไขสัญญา`,
         imp: `ทุก +1 บาท/ลบ.ม. ≈ +${mb(h.units / mo * 12)} ล้านบาท/ปี`, own: 'ผู้บริหาร + กฎหมาย/สัญญา', kpi: 'บาท/ลบ.ม. หอถัง', pg: 'revenue' }); }
     // 6) ข้อมูล
-    A.push({ p: 3, t: 'ปิดช่องโหว่ข้อมูลใน WMS', what: 'นำเข้าบิลลูกค้ารายใหญ่จาก Pay2Head 389 ใบ, ยกเลิกบิล/ทะเบียนทดสอบ, ให้ใบเสร็จบันทึกวันที่รับชำระ และทะเบียนที่สถานะไม่ตรงกับบิล', imp: 'ตัวเลขผู้บริหารไม่ต้องพึ่งไฟล์เสริม', own: 'IT + ผู้พัฒนา WMS', kpi: 'รายการในหน้าคุณภาพข้อมูล', pg: 'quality' });
+    A.push({ p: 3, t: 'ช่องโหว่ข้อมูลใน WMS ที่ควรปิด', what: 'แนวทาง: นำเข้าบิลลูกค้ารายใหญ่จาก Pay2Head 389 ใบ, ยกเลิกบิล/ทะเบียนทดสอบ, ให้ใบเสร็จบันทึกวันที่รับชำระ และทะเบียนที่สถานะไม่ตรงกับบิล', imp: 'ตัวเลขผู้บริหารไม่ต้องพึ่งไฟล์เสริม', own: 'IT + ผู้พัฒนา WMS', kpi: 'รายการในหน้าคุณภาพข้อมูล', pg: 'quality' });
     return A.sort((a, b) => a.p - b.p);
   }
   function ceoBlock() {
@@ -1203,9 +1223,9 @@
     return `
       <div class="grid g4 qa">${qa.map(([q, a, l]) => `<div class="card qa-card ${l}"><div class="qa-q"><span class="qa-ic" aria-hidden="true">${icon[l]}</span>${esc(q)}</div><div class="qa-a">${esc(a)}</div></div>`).join('')}</div>
       <div class="grid" style="margin-top:16px">
-        ${card('c-act', 'แผนปฏิบัติการที่เสนอ (Action Plan)', 'เรียงตามลำดับความสำคัญ · ผลกระทบเป็นประมาณการจากข้อมูลจริงในระบบ · ผู้รับผิดชอบเป็นข้อเสนอ ให้ผู้บริหารยืนยัน', 'สาขา (ตำบล) · ประเภทลูกค้า',
-          `<div class="tbl-wrap"><table class="t act" data-csvable="1"><thead><tr><th>ลำดับ</th><th>เรื่อง</th><th>ทำอะไร</th><th>ผลกระทบ (ประมาณ)</th><th>ผู้รับผิดชอบที่เสนอ</th><th>ตัวชี้วัดติดตาม</th><th></th></tr></thead><tbody>
-          ${A.map((a, i) => `<tr><td class="nw"><span class="prio p${a.p}">${a.p === 1 ? 'ด่วน' : a.p === 2 ? 'สำคัญ' : 'วางแผน'}</span></td><td><b>${i + 1}. ${a.t}</b></td><td>${a.what}</td><td class="nw">${a.imp}</td><td>${a.own}</td><td class="small">${a.kpi}</td><td class="nw"><a href="#${a.pg}">ดูข้อมูล →</a></td></tr>`).join('')}
+        ${card('c-act', 'ข้อเสนอแนะเพื่อพิจารณา', 'เรียงตามลำดับความสำคัญ · ผลกระทบเป็นประมาณการจากข้อมูลจริงในระบบ · ผู้รับผิดชอบเป็นข้อเสนอ ให้ผู้บริหารยืนยัน', 'สาขา (ตำบล) · ประเภทลูกค้า',
+          `<div class="tbl-wrap"><table class="t act" data-csvable="1"><thead><tr><th>ลำดับ</th><th>เรื่อง</th><th>แนวทางที่เสนอ</th><th>ผลกระทบ (ประมาณ)</th><th>หน่วยงานที่เกี่ยวข้อง</th><th>ตัวชี้วัดติดตาม</th><th></th></tr></thead><tbody>
+          ${A.map((a, i) => `<tr><td class="nw"><span class="prio p${a.p}">${a.p === 1 ? 'ควรพิจารณาก่อน' : a.p === 2 ? 'น่าพิจารณา' : 'ระยะยาว'}</span></td><td><b>${i + 1}. ${a.t}</b></td><td>${a.what}</td><td class="nw">${a.imp}</td><td>${a.own}</td><td class="small">${a.kpi}</td><td class="nw"><a href="#${a.pg}">ดูข้อมูล →</a></td></tr>`).join('')}
           </tbody></table></div>`, { csv: 1 })}
       </div>`;
   }
@@ -1261,8 +1281,8 @@
     rows.filter((r) => r.g.cat === 'g').forEach((r) => trs.push(tRow(r.g.name, r.a, r.b)));
     trs.push(tRow('รวมลูกค้าทั่วไป', subtotal('g', Y1), subtotal('g', Y0), 'sub'));
     trs.push({ head: 'ลูกค้าสัญญารายใหญ่' });
-    rows.filter((r) => r.g.cat === 'c').forEach((r) => trs.push(tRow(r.g.name, r.a, r.b)));
-    trs.push(tRow('รวมลูกค้าสัญญารายใหญ่', subtotal('c', Y1), subtotal('c', Y0), 'sub'));
+    rows.filter((r) => r.g.cat === 'c').forEach((r) => trs.push({ ...tRow(r.g.name, r.a, r.b), nc: 1 }));
+    trs.push({ ...tRow('รวมลูกค้าสัญญารายใหญ่', subtotal('c', Y1), subtotal('c', Y0), 'sub'), nc: 1 });
     const both = (y) => { const g = subtotal('g', y), c = subtotal('c', y); const o = {}; Object.keys(g).forEach((k) => { o[k] = g[k] + c[k]; }); return o; };
     trs.push(tRow('รวมรายได้ขายน้ำ (ทั่วไป + สัญญา)', both(Y1), both(Y0), 'water'));
     rows.filter((r) => r.g.cat === 'o').forEach((r) => trs.push(tRow(r.g.name, r.a, r.b)));
@@ -1270,14 +1290,16 @@
     trs.push(tRow('รวมรายได้ทั้งสิ้น', { net: t1 }, { net: t0 }, 'total'));
     // เงินเป็นล้านบาท 2 ตำแหน่ง (CSV ยังเป็นบาทเต็มผ่าน data-v)
     const mbv = (v) => `data-v="${v == null ? '' : Math.round(v * 100) / 100}"`;
-    const tbl = `<div class="tbl-wrap" style="max-height:none"><table class="t grp-t vlines" data-csvable="1"><thead>
-      <tr class="gh"><th rowspan="2">กลุ่มลูกค้า</th><th class="c-g gs" colspan="4">รายได้ (ล้านบาท)</th><th class="c-g gs" colspan="3">ปริมาณน้ำและราคาต่อหน่วย</th><th class="c-g gs" colspan="3">ลูกค้า</th></tr>
+    // สัดส่วนปริมาณน้ำ/ลูกค้า เทียบรวมขายน้ำ (ทั่วไป + สัญญา) = 100% · YoY ลบ.ม./ราย เทียบช่วงเดียวกันปีก่อน
+    const W1 = both(Y1), chgN = (a, b) => (a && b ? pillChg(a, b) : '–');
+    const tbl = `<div class="tbl-wrap" style="max-height:none"><table class="t grp-t rev-t vlines" data-csvable="1"><thead>
+      <tr class="gh"><th rowspan="2">กลุ่มลูกค้า</th><th class="c-g gs" colspan="4">รายได้ (ล้านบาท)</th><th class="c-g gs" colspan="5">ปริมาณน้ำและราคาต่อหน่วย</th><th class="c-g gs" colspan="5">ลูกค้า</th></tr>
       <tr><th class="n gs">${Y0 + 543}</th><th class="n">${Y1 + 543}</th><th class="n">YoY</th><th class="n">สัดส่วน</th>
-      <th class="n gs">ลบ.ม. ${Y1 + 543}</th><th class="n">บาท/ลบ.ม. ${(Y0 + 543) % 100}</th><th class="n">บาท/ลบ.ม. ${(Y1 + 543) % 100}</th><th class="n gs">จำนวน (ราย)</th><th class="n">บาท/ราย/เดือน ${(Y0 + 543) % 100}</th><th class="n">บาท/ราย/เดือน ${(Y1 + 543) % 100}</th></tr></thead><tbody>
-      ${trs.map((r) => r.head ? `<tr class="grp"><td colspan="11">${r.head}</td></tr>` : `<tr class="${r.cls || ''}"><td>${esc(r.label)}${r.label.startsWith('กปภ') && pwaGap.length ? ` <span class="pill warn" title="${esc(pwaTxt(pwaGap))}">⚠ ไม่มีรายได้ ${pwaGap.length} เดือน</span>` : ''}</td>
+      <th class="n gs">ลบ.ม. ${Y1 + 543}</th><th class="n">YoY</th><th class="n">สัดส่วน</th><th class="n">บาท/ลบ.ม. ${(Y0 + 543) % 100}</th><th class="n">บาท/ลบ.ม. ${(Y1 + 543) % 100}</th><th class="n gs">ราย ${Y1 + 543}</th><th class="n">YoY</th><th class="n">สัดส่วน</th><th class="n">บาท/ราย/เดือน ${(Y0 + 543) % 100}</th><th class="n">บาท/ราย/เดือน ${(Y1 + 543) % 100}</th></tr></thead><tbody>
+      ${trs.map((r) => r.head ? `<tr class="grp"><td colspan="15">${r.head}</td></tr>` : `<tr class="${r.cls || ''}"><td>${esc(r.label)}${r.label.startsWith('กปภ') && pwaGap.length ? ` <span class="pill warn" title="${esc(pwaTxt(pwaGap))}">⚠ ไม่มีรายได้ ${pwaGap.length} เดือน</span>` : ''}</td>
         <td class="n gs muted" ${mbv(r.b.net)}>${mb(r.b.net)}</td><td class="n" ${mbv(r.a.net)}><b>${mb(r.a.net)}</b></td><td class="n">${r.b.net ? pillChg(r.a.net, r.b.net) : '–'}</td><td class="n">${pct(t1 ? r.a.net / t1 : null)}</td>
-        <td class="n gs">${r.a.units ? int(r.a.units) : '–'}</td><td class="n">${fmtPU(r.b.units ? r.b.wnet / r.b.units : null)}</td><td class="n">${fmtPU(r.a.units ? r.a.wnet / r.a.units : null)}</td>
-        <td class="n gs">${r.a.cust ? int(r.a.cust) : '–'}</td><td class="n">${r.b.cm ? int(r.b.net / r.b.cm) : '–'}</td><td class="n">${r.a.cm ? int(r.a.net / r.a.cm) : '–'}</td></tr>`).join('')}
+        <td class="n gs">${r.a.units ? int(r.a.units) : '–'}</td><td class="n">${chgN(r.a.units, r.b.units)}</td><td class="n">${r.a.units && W1.units ? pct(r.a.units / W1.units) : '–'}</td><td class="n">${fmtPU(r.b.units ? r.b.wnet / r.b.units : null)}</td><td class="n">${fmtPU(r.a.units ? r.a.wnet / r.a.units : null)}</td>
+        <td class="n gs">${r.a.cust ? int(r.a.cust) : '–'}</td><td class="n">${r.nc ? '<span class="muted" title="ลูกค้าสัญญานับตามทะเบียนมาตร ปีก่อนบางรายบิลรวมใบเดียว — ไม่เทียบจำนวนราย">–</span>' : chgN(r.a.cust, r.b.cust)}</td><td class="n">${r.a.cust && W1.cust ? pct(r.a.cust / W1.cust) : '–'}</td><td class="n">${r.b.cm ? int(r.b.net / r.b.cm) : '–'}</td><td class="n">${r.a.cm ? int(r.a.net / r.a.cm) : '–'}</td></tr>`).join('')}
       </tbody></table></div>`;
 
     // ตำบล x กลุ่ม
@@ -1312,11 +1334,11 @@
     if (moov.length) { const lo = moov[0], hi = moov[moov.length - 1];
       ins.push(['info', `รายได้ตามหมู่: ${lo.br} ${lo.moo} ${pctTxt(lo.c)} · ${hi.br} ${hi.moo} ${pctTxt(hi.c)}`, `ความเปลี่ยนแปลงในระดับหมู่มาจากลูกค้า T3 ไม่กี่ราย (โรงแรม/คอนโด) — ดูรายชื่อที่หน้า “การใช้น้ำเทียบปีก่อน”`]); }
     const rec = [
-      ['หาลูกค้าแทนน้ำขายส่ง กปภ.', `กปภ. เคยซื้อเฉลี่ย ~${int(PW.units / Math.max(1, new Set(S.rev.filter((r) => r.y === Y1 && r.ty === 'T2.2' && r.net > 0).map((r) => r.mm)).size))} ลบ.ม./เดือน ที่ ${fmtPU(pu(PW))} บาท/ลบ.ม. หากขายน้ำส่วนนี้ให้ลูกค้า T3 ได้ 10,000 ลบ.ม./เดือน ≈ +${mb(10000 * (pu(T3) || 0) * 12)} ล้านบาท/ปี — จัดลำดับโครงการ/โรงแรมตามแนวท่อในแต่ละหมู่ที่ยังไม่เป็นลูกค้า หรือเจรจาสัญญา กปภ. รอบใหม่`],
-      ['ทบทวนอัตราน้ำ อบต.ไม้ขาว (หอถังสูง)', `ราคาเฉลี่ย ${fmtPU(pu(HT))} บาท/ลบ.ม. ต่ำกว่าทุกกลุ่ม ทั้งที่ปริมาณสูงสุด — พิจารณาในการเจรจา/ทบทวนเงื่อนไขสัญญาสัมปทาน (ทุก +1 บาท ≈ +${mb(HT.units / months * 12)} ล้านบาท/ปี)`],
-      ['รักษาและขยายลูกค้า T3', `T3 ${int(T3.cust)} รายสร้างรายได้ ${pct(T3.net / t1)} — ตั้งผู้ดูแลลูกค้ารายใหญ่ ติดตามรายที่ใช้น้ำลดลง (มีรายชื่อในหน้าการใช้น้ำ) ตรวจมาตร/สอบถามแหล่งน้ำทดแทน และเสนอการเชื่อมต่อให้โครงการใหม่`],
-      ['ทอท.: ต่ออายุสัญญาและเร่งเก็บหนี้', `รายได้ ${mb(AOT.net)} ล้านบาท ที่ ${fmtPU(pu(AOT))} บาท/ลบ.ม. — ใช้รอบต่อสัญญาทบทวนราคา/ปริมาณขั้นต่ำ และเร่งติดตามหนี้ค้าง (ดูหน้าการจัดเก็บ)`],
-      ['ลูกค้า T2 และ T2.1', `T2 รายได้ต่อรายลดลง — ตรวจการจัดประเภท (รายที่ใช้น้ำสูงควรเป็น T3) และสิทธิ์น้ำฟรี · T2.1 ตำรวจภูธรภาค 8 ราคา ${fmtPU(pu(A('T2.1', Y1)))} บาท/ลบ.ม. ต่ำกว่า T2 (${fmtPU(pu(T2))}) ควรทบทวนเงื่อนไขอัตรา`],
+      ['โอกาสหาลูกค้าแทนน้ำขายส่ง กปภ.', `กปภ. เคยซื้อเฉลี่ย ~${int(PW.units / Math.max(1, new Set(S.rev.filter((r) => r.y === Y1 && r.ty === 'T2.2' && r.net > 0).map((r) => r.mm)).size))} ลบ.ม./เดือน ที่ ${fmtPU(pu(PW))} บาท/ลบ.ม. หากขายน้ำส่วนนี้ให้ลูกค้า T3 ได้ 10,000 ลบ.ม./เดือน ≈ +${mb(10000 * (pu(T3) || 0) * 12)} ล้านบาท/ปี — แนวทาง: จัดลำดับโครงการ/โรงแรมตามแนวท่อในแต่ละหมู่ที่ยังไม่เป็นลูกค้า หรือเจรจาสัญญา กปภ. รอบใหม่`],
+      ['อัตราน้ำ อบต.ไม้ขาว (หอถังสูง) ต่ำสุดทุกกลุ่ม', `ราคาเฉลี่ย ${fmtPU(pu(HT))} บาท/ลบ.ม. ต่ำกว่าทุกกลุ่ม ทั้งที่ปริมาณสูงสุด — อาจใช้เป็นประเด็นเมื่อเจรจา/ทบทวนเงื่อนไขสัญญาสัมปทาน (ทุก +1 บาท ≈ +${mb(HT.units / months * 12)} ล้านบาท/ปี)`],
+      ['ลูกค้า T3 แหล่งรายได้หลัก', `T3 ${int(T3.cust)} รายสร้างรายได้ ${pct(T3.net / t1)} — แนวทาง: มีผู้ดูแลลูกค้ารายใหญ่ ติดตามรายที่ใช้น้ำลดลง (มีรายชื่อในหน้าการใช้น้ำ) ตรวจมาตร/สอบถามแหล่งน้ำทดแทน และเสนอการเชื่อมต่อให้โครงการใหม่`],
+      ['ทอท.: รอบต่ออายุสัญญาและหนี้ค้าง', `รายได้ ${mb(AOT.net)} ล้านบาท ที่ ${fmtPU(pu(AOT))} บาท/ลบ.ม. — แนวทาง: ใช้รอบต่อสัญญาทบทวนราคา/ปริมาณขั้นต่ำ และติดตามหนี้ค้าง (ดูหน้าการจัดเก็บ)`],
+      ['ลูกค้า T2 และ T2.1', `T2 รายได้ต่อรายลดลง — แนวทาง: ตรวจการจัดประเภท (รายที่ใช้น้ำสูงควรเป็น T3) และสิทธิ์น้ำฟรี · T2.1 ตำรวจภูธรภาค 8 ราคา ${fmtPU(pu(A('T2.1', Y1)))} บาท/ลบ.ม. ต่ำกว่า T2 (${fmtPU(pu(T2))}) อาจทบทวนเงื่อนไขอัตรา`],
     ];
     // ป้ายผลกระทบ (สีเขียว ชิดขวา) ของข้อเสนอแนะแต่ละข้อ — คำนวณจากตัวเลขชุดเดียวกับข้อความ
     const recImp = [`+${mb(10000 * (pu(T3) || 0) * 12)} ล้าน/ปี`, `+${mb(HT.units / months * 12)} ล้าน/ปี ต่อ 1 บาท`, `${pct(t1 ? T3.net / t1 : null)} ของรายได้`, `${mb(AOT.net)} ล้าน/ปี`, 'ทบทวนอัตรา'];
@@ -1329,10 +1351,6 @@
         ${kpi('รายได้ไม่รวม กปภ.', mb(ex1), 'ล้านบาท', `ฐานธุรกิจต่อเนื่อง (ไม่นับน้ำขายส่ง กปภ. ที่สัญญาสิ้นสุด) · ปีก่อน ${mb(ex0)} ล้านบาท`, [cmpRow('YoY', ex1, ex0), ['ปีก่อน', mb(ex0) + ' ล้าน', 'v-mute']], 'accent')}
         ${kpi('ราคาเฉลี่ยต่อหน่วย', nf2.format(uAll1 ? wAll1 / uAll1 : 0), 'บาท/ลบ.ม.', 'รายได้ค่าน้ำ+บริการ ÷ ลบ.ม. ที่ออกใบแจ้งหนี้ ทุกกลุ่มที่มีหน่วยน้ำ', [['ปริมาณน้ำ', int(uAll1) + ' ลบ.ม.', 'v-mute']])}
         ${kpi('รายได้ต่อราย/เดือน (ลูกค้าทั่วไป)', int(cmGen1 ? g1.net / cmGen1 : 0), 'บาท', 'รายได้ลูกค้าทั่วไป ÷ จำนวนบิลรายเดือน', [cmpRow('YoY', cmGen1 ? g1.net / cmGen1 : 0, g0.cm ? g0.net / g0.cm : 0), ['ลูกค้าทั่วไป', int(g1.cust) + ' ราย', 'v-mute']])}
-      </div>
-      <div class="row">
-        ${card('c-ins', 'Insight', 'สรุปจากข้อมูลจริงตามตัวกรองที่เลือก', 'สาขา (ตำบล) · ประเภทลูกค้า', `<ul class="ilist">${ins.map(([l, t, d]) => `<li><span class="ic ${l}" aria-hidden="true">${l === 'bad' ? '!' : l === 'warn' ? '⚠' : 'i'}</span><div><div class="t1">${esc(t)}</div><div class="d">${esc(d)}</div></div></li>`).join('')}</ul>`, { min: 520 })}
-        ${card('c-rec', 'ข้อเสนอแนะเพื่อเพิ่มรายได้', 'ตัวเลขประมาณการจากข้อมูลช่วงนี้ ใช้ประกอบการตัดสินใจ ไม่ใช่ผลที่รับประกัน', '', `<ol class="ilist rec">${rec.map(([t, d], i) => `<li><span class="no">${i + 1}</span><div><div class="t1">${esc(t)}</div><div class="d">${esc(d)}</div></div>${recImp[i] ? `<span class="imp">${esc(recImp[i])}</span>` : ''}</li>`).join('')}</ol>`, { min: 520 })}
       </div>
       <div class="row">
         ${card('c-rev', `รายได้แยกกลุ่มลูกค้า ${per}`, 'ล้านบาท ไม่รวม VAT · หักส่วนลดและใบลดหนี้แล้ว · บาท/ลบ.ม. = รายได้ค่าน้ำ+บริการ ÷ ลบ.ม. ที่ออกใบแจ้งหนี้ · ต่อราย = รายได้ ÷ จำนวนบิลรายเดือน · หน่วยน้ำลูกค้าสัญญาก่อน มี.ค. 69 จากไฟล์ตรวจเทียบ Pay2Head', 'สาขา (ตำบล) · ประเภทลูกค้า (ช่วงเดือนไม่มีผล: ใช้ ม.ค.–เดือนเต็มล่าสุด)', tbl, { csv: 1, csvLabel: 'CSV (บาทเต็ม)' })}
@@ -1349,7 +1367,11 @@
         ${card('c-brg', 'รายได้แยกตำบล × กลุ่มลูกค้า', `ล้านบาท · ${per} เทียบปีก่อน · สาขาไม้ขาว = ตำบลไม้ขาว, สาขาสาคู = ตำบลสาคู`, 'สาขา (ตำบล) · ประเภทลูกค้า', brTbl, { csv: 1 })}
       </div>
       <div class="row">
-        ${card('c-moo', 'รายได้ลูกค้าทั่วไปแยกหมู่', 'บาท · หมู่อ่านจากที่อยู่ในใบแจ้งหนี้ (ไม่รวมลูกค้าสัญญารายใหญ่) · “ไม่ระบุหมู่” = ที่อยู่ไม่มีเลขหมู่หรืออยู่นอกตำบล · แถบ YoY ตัดที่ ±50%', 'สาขา (ตำบล) · ประเภทลูกค้า · หมู่', '<div id="t-moo"></div>', { csv: 1 })}
+        ${card('c-moo', 'รายได้ลูกค้าทั่วไปแยกหมู่', 'บาท · หมู่ตามทะเบียนผู้ใช้น้ำ (ที่ตั้งมาตร) ถ้าทะเบียนไม่ระบุจึงใช้ที่อยู่ในใบแจ้งหนี้ (ไม่รวมลูกค้าสัญญารายใหญ่) · “ไม่ระบุหมู่” = ทะเบียนและใบแจ้งหนี้ไม่มีเลขหมู่ในตำบลไม้ขาว/สาคู · แถบ YoY ตัดที่ ±50%', 'สาขา (ตำบล) · ประเภทลูกค้า · หมู่', '<div id="t-moo"></div>', { csv: 1 })}
+      </div>
+      <div class="row">
+        ${card('c-ins', 'สรุปข้อสังเกต (Insight)', 'สรุปจากตัวเลขทั้งหน้าตามตัวกรองที่เลือก', 'สาขา (ตำบล) · ประเภทลูกค้า', `<ul class="ilist">${ins.map(([l, t, d]) => `<li><span class="ic ${l}" aria-hidden="true">${l === 'bad' ? '!' : l === 'warn' ? '⚠' : 'i'}</span><div><div class="t1">${esc(t)}</div><div class="d">${esc(d)}</div></div></li>`).join('')}</ul>`, { min: 520 })}
+        ${card('c-rec', 'ข้อเสนอแนะเพื่อเพิ่มรายได้ (เพื่อพิจารณา)', 'ตัวเลขประมาณการจากข้อมูลช่วงนี้ ใช้ประกอบการตัดสินใจ ไม่ใช่ผลที่รับประกัน', '', `<ol class="ilist rec">${rec.map(([t, d], i) => `<li><span class="no">${i + 1}</span><div><div class="t1">${esc(t)}</div><div class="d">${esc(d)}</div></div>${recImp[i] ? `<span class="imp">${esc(recImp[i])}</span>` : ''}</li>`).join('')}</ol>`, { min: 520 })}
       </div>`;
     void nameS;
     $('t-moo').innerHTML = table([
@@ -1476,10 +1498,15 @@
       { h: `ลบ.ม. ${Y0 + 543}`, n: 1, cls: 'muted', f: (r) => int(r.q0) }, { h: `ลบ.ม. ${Y1 + 543}`, n: 1, f: (r) => int(r.q1) }, { h: 'ผลต่าง (ลบ.ม.)', cls: 'bar-cell', f: (r) => `<span class="hb"><span class="track"><i style="width:${((r.q0 - r.q1) / dMax * 100).toFixed(1)}%"></i></span><b>−${int(r.q0 - r.q1)}</b></span>`, v: (r) => r.q1 - r.q0 },
       { h: '%', n: 1, f: (r) => `<b class="v-bad">${r.q0 ? '−' + nf1.format(Math.abs((r.q1 - r.q0) / r.q0 * 100)) + '%' : '–'}</b>`, v: (r) => (r.q0 ? nf1.format((r.q1 - r.q0) / r.q0 * 100) : '') },
     ], dl);
-    const au = (U.audit || []).map(([reg, name, br, status, ty, lb, issue]) => ({ reg, name, br, status, ty, lb, issue })).filter((r) => okBr(r.br));
+    const au = (U.audit || []).map(([reg, name, br, status, ty, lb, issue, inst]) => ({ reg, name, br, status, ty, lb, issue, inst })).filter((r) => okBr(r.br));
+    // ข้อสังเกตเพิ่ม: ติดตั้งมาตรภายใน 2 เดือนล่าสุด = ยังไม่ครบรอบออกบิล (ไม่ใช่ความผิดพลาด) · กปภ. = สัญญาสิ้นสุด
+    const [ly, lm] = S.lastFull.split('-').map(Number), winStart = lm === 1 ? `${ly - 1}-12-01` : `${ly}-${String(lm - 1).padStart(2, '0')}-01`;
+    const auWhy = (r) => (r.issue !== 'active_no_bill' ? '' : r.inst && r.inst >= winStart ? `<span class="info-line">ⓘ ติดตั้งมาตร ${dLabel(r.inst)} — ยังไม่ครบรอบจดและออกบิล</span>`
+      : r.ty === 'T2.2' ? '<span class="info-line">ⓘ สัญญาขายส่ง กปภ. สิ้นสุดแล้ว — ทะเบียนยังเป็นสถานะใช้งาน</span>'
+      : r.inst ? `<span class="warn-line">⚠ ติดตั้งมาตรตั้งแต่ ${dLabel(r.inst)} แต่ยังไม่มีบิล</span>` : '');
     $('t-aud').innerHTML = au.length ? table([
       { h: 'ทะเบียน', nw: 1, k: 'reg' }, { h: 'ชื่อ', f: (r) => esc(r.name || '–'), cls: 'name' }, { h: 'สาขา', nw: 1, k: 'br' }, { h: 'สถานะทะเบียน', nw: 1, f: (r) => esc(STATUS_TH[r.status] || r.status) },
-      { h: 'บิลล่าสุด', nw: 1, f: (r) => (r.lb ? dLabel(r.lb) : 'ไม่เคยมีบิล') }, { h: 'ข้อสังเกต', f: (r) => `<span class="pill warn">⚠ ${esc(AUDIT[r.issue] || r.issue)}</span>` },
+      { h: 'บิลล่าสุด', nw: 1, f: (r) => (r.lb ? dLabel(r.lb) : 'ไม่เคยมีบิล') }, { h: 'ข้อสังเกต', f: (r) => `<span class="pill warn">⚠ ${esc(AUDIT[r.issue] || r.issue)}</span>${auWhy(r)}`, v: (r) => (AUDIT[r.issue] || r.issue) + (r.inst ? ` · ติดตั้งมาตร ${r.inst}` : '') },
     ], au) : '<div class="state">ไม่พบรายการที่ไม่สอดคล้อง</div>';
     drawYoY(Y0, Y1, lastM, S.qdMetric || 'u');
     document.querySelectorAll('#c-qd .seg2 button').forEach((b) => b.addEventListener('click', () => {
@@ -1574,7 +1601,7 @@
 
       ['ส่วนลดในใบแจ้งหนี้ค่าน้ำรวม VAT แต่ VAT ไม่ถูกลดตาม (WMS-307)', 'ยอดขายถอด VAT ออกจากส่วนลดตามสัดส่วน', 'ยอดรวม VAT ใน dashboard อาจต่างจากยอดในใบแจ้งหนี้เล็กน้อย'],
       ['ลูกหนี้คำนวณได้เฉพาะ ณ วันที่ดึงข้อมูล', 'ระบบไม่เก็บประวัติสถานะรายวัน', 'การเลือกวันอ้างอิงย้อนหลังในโหมดสดจะใช้สถานะปัจจุบันของเอกสาร'],
-      ['ประเภทลูกค้าและสาขาใช้ค่าในทะเบียนปัจจุบัน · หมู่ใช้ที่อยู่ในใบแจ้งหนี้ล่าสุด', 'ไม่ใช่ค่า ณ วันที่ออกบิล', 'ลูกค้าที่ย้ายประเภทจะถูกนับในประเภทใหม่ทั้งช่วง'],
+      ['ประเภทลูกค้าและสาขาใช้ค่าในทะเบียนปัจจุบัน · หมู่ใช้ค่าในทะเบียนปัจจุบัน (สำรองด้วยที่อยู่ในใบแจ้งหนี้ล่าสุด)', 'ไม่ใช่ค่า ณ วันที่ออกบิล', 'ลูกค้าที่ย้ายประเภทจะถูกนับในประเภทใหม่ทั้งช่วง'],
       ['ชื่อลูกค้าแสดงเต็ม', 'ลูกค้ายินยอมให้เปิดเผยชื่อตอนสมัครใช้น้ำ · ชื่อมาจากใบแจ้งหนี้ล่าสุด', 'ไม่แสดงเลขบัตร เบอร์โทร ที่อยู่ และบัญชีธนาคาร (ไม่จำเป็นต่อ dashboard)'],
     ];
     el.innerHTML = `

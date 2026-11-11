@@ -2,12 +2,16 @@
 -- ใช้แทน 02_dma_monthly (การผูก DMA ในทะเบียนยังไม่ครบ จึงยังไม่ใช้ DMA ในรายงาน)
 -- หมู่: อ่านจากที่อยู่ในใบแจ้งหนี้ล่าสุดของผู้ใช้น้ำ (ข้อความ "หมู่ที่/หมู่/ม.") เหมือน 13_revenue_groups
 --       ใช้เฉพาะที่อยู่ในตำบลไม้ขาว/สาคู หรือไม่ระบุตำบล นอกนั้น = ไม่ระบุหมู่ · สาขา = สาขาของใบแจ้งหนี้
+-- หมู่ (ปรับ 11/11/69): ใช้หมู่ + ตำบลในทะเบียน customer_waters (moo, sub_district = ที่ตั้งมาตร) ก่อน
+--       ถ้าทะเบียนไม่ระบุหรืออยู่นอกตำบลไม้ขาว/สาคู จึงอ่านจากที่อยู่ในใบแจ้งหนี้ล่าสุดเหมือนเดิม
 with addr as (select distinct on (customer_water_id) customer_water_id cw, customer_address a from record_invoices
          where status <> 'cancelled' and customer_water_id is not null order by customer_water_id, issue_date desc, id desc),
 cw as (
   select c.id, split_part(t.name, ' - ', 1) ty,
-         case when m.moo is not null and (m.tb is null or m.tb in ('ไม้ขาว', 'ใม้ขาว', 'สาคู', 'สาคุ')) then 'หมู่ ' || m.moo::int else 'ไม่ระบุหมู่' end moo
+         case when wt.sub_district in ('ไม้ขาว', 'ใม้ขาว', 'สาคู', 'สาคุ') and wt.moo ~ '^\s*\d{1,2}\s*$' then 'หมู่ ' || trim(wt.moo)::int
+              when m.moo is not null and (m.tb is null or m.tb in ('ไม้ขาว', 'ใม้ขาว', 'สาคู', 'สาคุ')) then 'หมู่ ' || m.moo::int else 'ไม่ระบุหมู่' end moo
   from vw_dash_customer_waters c left join customer_water_types t on t.id = c.type_id
+  left join customer_waters wt on wt.id = c.id
   left join lateral (select substring(x.a from '(?:หมู่ที่|หมู่|ม\.)\s*(\d{1,2})') moo, substring(x.a from '(?:ตำบล|ต\.)\s*([ก-๙]+)') tb from addr x where x.cw = c.id) m on true),
 inv as (
   select distinct on (i.invoice_number, i.customer_water_id, i.issue_date, i.total, i.water_unit) i.*

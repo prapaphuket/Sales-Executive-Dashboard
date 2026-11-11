@@ -17,7 +17,9 @@ q as (select g.id, g.reg, g.branch_id, g.ty, g.status, g.personal_type,
       from gen g cross join w left join inv i on i.customer_water_id = g.id group by 1, 2, 3, 4, 5, 6),
 cls as (select q.*, case when q0 = 0 and q1 = 0 then null when q0 = 0 then 'new' when q1 = 0 then 'stop'
                          when q1 >= q0 * 1.1 then 'up' when q1 <= q0 * 0.9 then 'down' else 'flat' end k from q),
-nm as (select distinct on (customer_water_id) customer_water_id cw, customer_name from record_invoices where status <> 'cancelled' order by customer_water_id, issue_date desc, id desc),
+-- ชื่อ: ใบแจ้งหนี้ล่าสุด → ถ้ายังไม่เคยมีบิลใช้ชื่อในทะเบียน customer_waters.name (อ่านเฉพาะ id, name)
+nm as (select w.id cw, coalesce(i.customer_name, nullif(trim(w.name), '')) customer_name from customer_waters w
+       left join (select distinct on (customer_water_id) customer_water_id, customer_name from record_invoices where status <> 'cancelled' order by customer_water_id, issue_date desc, id desc) i on i.customer_water_id = w.id),
 monthly as (
   select to_char(i.issue_date, 'YYYY-MM') m, coalesce(b.name, 'ไม่ระบุ') br,
          sum(i.water_unit) filter (where coalesce(g.ty, '?') not in ('T2.2', 'T2.3', 'T3.1') and fb.fb < w.ys) q_exist,
@@ -41,6 +43,7 @@ select json_build_object('ds', 'usage_compare',
            from (select * from cls where k in ('down', 'stop') order by q1 - q0 limit 20) d left join nm on nm.cw = d.id left join branches b on b.id = d.branch_id),
   'monthly_cols', json_build_array('m', 'br', 'q_exist', 'q_excl_pwa', 'q_all'),
   'monthly', (select json_agg(json_build_array(m, br, round(q_exist), round(q_excl_pwa), round(q_all)) order by m, br) from monthly),
-  'audit_cols', json_build_array('reg', 'name', 'br', 'status', 'ty', 'last_bill', 'issue'),
-  'audit', (select json_agg(json_build_array(a.reg, coalesce(nm.customer_name, '–'), coalesce(b.name, 'ไม่ระบุ'), a.status, coalesce(a.ty, '?'), to_char(a.lb, 'YYYY-MM-DD'), a.issue) order by a.issue, b.name, a.reg)
+  'audit_cols', json_build_array('reg', 'name', 'br', 'status', 'ty', 'last_bill', 'issue', 'inst'),
+  'audit', (select json_agg(json_build_array(a.reg, coalesce(nm.customer_name, '–'), coalesce(b.name, 'ไม่ระบุ'), a.status, coalesce(a.ty, '?'), to_char(a.lb, 'YYYY-MM-DD'), a.issue,
+              (select to_char(max(wa.installed_at), 'YYYY-MM-DD') from water_meter_assignments wa where wa.customer_water_id = a.id and wa.action_type = 'install')) order by a.issue, b.name, a.reg)
             from audit a left join nm on nm.cw = a.id left join branches b on b.id = a.branch_id where a.issue is not null and b.status = 'active'));
