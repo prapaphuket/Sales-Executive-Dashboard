@@ -665,3 +665,22 @@ td.area{max-width:260px;width:260px}
 .ms-b i{display:block;height:12px;border-radius:3px;background:var(--status-bad);min-width:2px} .ms-b b{text-align:right}
 .snap-t-tbl .dmil { display: inline-block; margin-right: 6px; font-size: 11px; font-weight: 500; opacity: .85; }
 @media print { .snap-t-tbl .dmil { margin-right: 4px; font-size: 9.5px; } .snap-t-tbl td { padding-top: 3px; padding-bottom: 3px; } }
+/* แถวรวมกลุ่ม (รวมลูกค้าทั่วไป / รวมลูกค้าสัญญา): เส้นบน–ล่างให้เห็นชัด (ฝ่ายกลยุทธ์ขอ 11/11/69) */
+.t tr.sub td, .snap-t-tbl tr.sub td { border-top: 2px solid color-mix(in srgb, var(--accent) 60%, transparent); border-bottom: 2px solid color-mix(in srgb, var(--accent) 60%, transparent); }
+@media print { .t tr.sub td, .snap-t-tbl tr.sub td { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+.snap-t-tbl small.note-w { color: var(--status-warn, #C98A1B); font-weight: 600; }
+/* ตัวกรองประเภทลูกค้าแบบเลือกได้หลายประเภท */
+.pfilters .flbl { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--text-2); }
+.pfilters .flbl[hidden] { display: none; }
+.msel { position: relative; }
+.msel-btn { border: 1px solid var(--ctl, var(--line-strong)); border-radius: 8px; padding: 6px 30px 6px 10px; min-height: 36px; min-width: 150px; max-width: 240px; font-size: 14px; background: var(--card); color: var(--fg); text-align: left; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: inherit;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%); background-position: calc(100% - 15px) 50%, calc(100% - 10px) 50%; background-size: 5px 5px; background-repeat: no-repeat; }
+.msel-btn.active { background-color: var(--active-bg); color: var(--active-fg); border-color: var(--accent); }
+.msel-btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+.msel-pop { position: absolute; z-index: 50; top: calc(100% + 4px); left: 0; min-width: 230px; background: var(--card); border: 1px solid var(--line-strong); border-radius: 10px; box-shadow: 0 10px 28px rgba(0,0,0,.28); padding: 6px; }
+.msel-top { display: flex; justify-content: space-between; padding: 2px 6px 6px; border-bottom: 1px solid var(--line); margin-bottom: 4px; font-size: 13px; }
+.msel-opt { display: flex !important; flex-direction: row !important; align-items: center; gap: 8px !important; padding: 6px 8px; border-radius: 6px; font-size: 14px !important; color: var(--fg) !important; cursor: pointer; }
+.msel-opt:hover { background: var(--subtle-bg); }
+.msel-opt input { width: 16px; height: 16px; min-height: 0 !important; min-width: 0 !important; accent-color: var(--accent); }
+@media print { .msel-pop { display: none; } }
+.msel::after { content: ""; position: absolute; right: 12px; top: 50%; width: 7px; height: 7px; margin-top: -5px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); pointer-events: none; color: var(--fg); opacity: .8; }

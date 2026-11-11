@@ -30,6 +30,11 @@
     baseText.color = C.text2;
   }
   const TH_M = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+  // หมู่บ้านมอร์แกน (AR00C-03022, หอถัง T2.3): ใช้น้ำจริง จดหน่วยแบบแมนนวล ยังไม่ลงใน WMS (บิลในระบบยกเลิกทั้งหมด) — แจ้ง 11/11/69
+  // แสดงหมายเหตุจนกว่าจะมีหน่วยน้ำของทะเบียนนี้ในระบบ
+  const MORGAN = 'AR00C-03022';
+  const morganMissing = () => !(S.cm || []).some((r) => r.reg === MORGAN && r.u.some((v) => typeof v === 'number' && v > 0));
+  const MORGAN_TXT = 'ยังไม่รวมหมู่บ้านมอร์แกน (AR00C-03022) — ใช้น้ำจริง จดหน่วยไว้นอกระบบ ยังไม่ได้ลงใน WMS';
   const TY_NAME = { T1: 'T1', T2: 'T2', 'T2.1': 'T2.1 ตำรวจภูธรภาค 8', 'T2.2': 'T2.2 กปภ.', 'T2.3': 'T2.3 อบต. (หอถังสูง)', T3: 'T3', 'T3.1': 'T3.1 ทอท.', 'ชั่วคราว-ไม้ขาว': 'ชั่วคราว', '?': 'ไม่ระบุ/รอตรวจสอบ' };
   const CH_NAME = { transfer: 'โอน', direct: 'หักบัญชี', cash: 'เงินสด', cheque: 'เช็ค', scan: 'สแกนจ่าย', '?': 'ไม่ระบุ' };
   const KIND_NAME = { water: 'ค่าน้ำ', water_legacy: 'ค่าน้ำ', fee: 'งานขาย/บริการ', bond: 'เงินประกัน' };
@@ -99,6 +104,7 @@
     S.rev = d.revenue_groups ? rowsOf(d.revenue_groups) : [];
     S.revCust = d.revenue_groups ? d.revenue_groups.cust.map((r) => Object.fromEntries(d.revenue_groups.cust_cols.map((c, i) => [c, r[i]]))) : [];
     // หน่วยน้ำรายเดือนรายผู้ใช้น้ำ (คำนวณตามช่วงเดือนที่เลือก) · u: ตัวเลข = ลบ.ม., 'L' = มีบิลระบบเดิมไม่มีหน่วย, ว่าง = ไม่มีบิล
+    S.regMoo = d.reg_moo ? d.reg_moo.map : {};
     S.cmMonths = d.cust_months ? d.cust_months.months : [];
     S.cm = d.cust_months ? rowsOf(d.cust_months).map((r) => ({ ...r, u: r.u.split(',').map((v) => (v === '' ? null : v === 'L' ? 'L' : +v)) })) : [];
     S.asofMonth = S.asof.slice(0, 7);
@@ -156,7 +162,7 @@
   const FX = [
     ['ช่วงเดือน', 'ยอดขาย ปริมาณน้ำ ลูกค้าใช้งาน/ลูกค้าใหม่ ยอดรับชำระ อัตราเก็บเงินรายรุ่น ยอดตามหมู่ · รายได้ตามกลุ่มลูกค้าและการใช้น้ำเทียบปีก่อน (เทียบเดือนเดียวกันปีก่อน)', 'ลูกหนี้คงค้าง (ใช้วันอ้างอิง) · ลูกค้ารายใหญ่ (12 เดือนเต็มล่าสุด) · รายการลูกค้าลดลง (3 เดือนเต็มล่าสุด)'],
     ['สาขา (ตำบล)', 'ทุก KPI และกราฟ ยกเว้นที่ระบุ · สาขาและตำบลคือชุดเดียวกัน (ไม้ขาว, สาคู) · ตัวกรองหมู่จะแสดงเฉพาะหมู่ของตำบลที่เลือก', 'ข้อมูลเก่าที่สาขาปิดหรือไม่ระบุสาขา (ยอดเล็กน้อย) นับรวมเฉพาะใน “ทุกสาขา”'],
-    ['ประเภทลูกค้า', 'ยอดขาย ปริมาณน้ำ ลูกค้า ลูกหนี้ ลูกค้ารายใหญ่ ลูกค้าลดลง ยอดตามหมู่', 'ยอดรับชำระ · อัตราเก็บเงินรายรุ่น'],
+    ['ประเภทลูกค้า (เลือกได้หลายประเภท)', 'ยอดขาย ปริมาณน้ำ ลูกค้า ลูกหนี้ ลูกค้ารายใหญ่ ลูกค้าลดลง ยอดตามหมู่', 'ยอดรับชำระ · อัตราเก็บเงินรายรุ่น'],
     ['หมู่', 'ตารางยอดค่าน้ำตามหมู่ (หน้ายอดขาย) · ตารางรายได้แยกหมู่ (หน้ารายได้)', 'KPI และกราฟอื่นทั้งหมด (ใบแจ้งหนี้งานขาย/ใบลดหนี้/ใบเสร็จไม่มีข้อมูลหมู่)'],
     ['วันอ้างอิงลูกหนี้', 'ลูกหนี้คงค้าง อายุหนี้ ลูกหนี้รายใหญ่ อัตราเก็บเงินรายรุ่น (นับรับชำระถึงวันนี้)', 'ยอดขายและยอดรับชำระ (ใช้ช่วงเดือน)'],
   ];
@@ -165,7 +171,10 @@
     $('f-from').innerHTML = mOpts; $('f-to').innerHTML = mOpts;
     // สาขา = ตำบล (ไม้ขาว, สาคู) · ข้อมูลเก่าที่สาขาปิด/ไม่ระบุ (ยอดเล็กน้อย) ยังนับใน "ทุกสาขา"
     $('f-br').innerHTML = '<option value="">ทุกสาขา</option>' + MOO_BR.filter((b) => S.branches.includes(b)).map((b) => `<option>${esc(b)}</option>`).join('');
-    $('f-ty').innerHTML = '<option value="">ทุกประเภท</option>' + S.types.map((t) => `<option value="${esc(t)}">${esc(TY_NAME[t] || t)}</option>`).join('');
+    // ประเภทลูกค้า: เลือกได้หลายประเภท (ฝ่ายกลยุทธ์ขอ 11/11/69) · ค่าเก็บใน #f-ty เป็น "T1,T2" ('' = ทุกประเภท)
+    $('f-ty-pop').innerHTML = '<div class="msel-top"><button type="button" class="linkbtn" data-all="1">ทุกประเภท</button><button type="button" class="linkbtn" data-close="1">ปิด</button></div>' +
+      S.types.map((t) => `<label class="msel-opt"><input type="checkbox" value="${esc(t)}"> ${esc(TY_NAME[t] || t)}</label>`).join('');
+    initTySel();
     fillMoo();
     $('fx-body').innerHTML = '<table class="t small"><thead><tr><th>ตัวกรอง</th><th>มีผลกับ</th><th>ไม่มีผลกับ</th></tr></thead><tbody>' +
       FX.map((r) => `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join('') + '</tbody></table>';
@@ -196,7 +205,7 @@
     setDefaults();
     try {
       const saved = JSON.parse(localStorage.getItem('hea-dash-f') || 'null');
-      if (saved) for (const k of ['f-from', 'f-to', 'f-br', 'f-ty', 'f-moo']) { const el = $(k), v = saved[k]; if (k === 'f-moo') fillMoo(); if (el && v != null && [...el.options].some((o) => o.value === v)) el.value = v; }
+      if (saved) for (const k of ['f-from', 'f-to', 'f-br', 'f-ty', 'f-moo']) { const el = $(k), v = saved[k]; if (k === 'f-moo') fillMoo(); if (k === 'f-ty') { if (typeof v === 'string') el.value = v.split(',').filter((t) => S.types.includes(t)).join(','); continue; } if (el && v != null && [...el.options].some((o) => o.value === v)) el.value = v; }
     } catch (e) { /* storage อาจใช้ไม่ได้ */ }
     readFilters();
   }
@@ -204,12 +213,32 @@
     let from = $('f-from').value, to = $('f-to').value;
     if (from > to) { [from, to] = [to, from]; $('f-from').value = from; $('f-to').value = to; }
     S.f = { from, to, br: $('f-br').value, ty: $('f-ty').value, moo: $('f-moo').value };
-    ['f-br', 'f-ty', 'f-moo'].forEach((id) => $(id).classList.toggle('active', !!$(id).value));
+    ['f-br', 'f-moo'].forEach((id) => $(id).classList.toggle('active', !!$(id).value));
+    S.tySet = new Set(S.f.ty ? S.f.ty.split(',') : []); syncTySel();
     try { localStorage.setItem('hea-dash-f', JSON.stringify({ 'f-from': from, 'f-to': to, 'f-br': S.f.br, 'f-ty': S.f.ty, 'f-moo': S.f.moo })); } catch (e) { /* ignore */ }
   }
   function onFilter() { readFilters(); render(); }
   const okBr = (b) => !S.f.br || b === S.f.br;
-  const okTy = (t) => !S.f.ty || t === S.f.ty;
+  const okTy = (t) => !S.f.ty || (S.tySet ? S.tySet.has(t) : S.f.ty.split(',').includes(t));
+  const tyLabel = (v) => (v || '').split(',').filter(Boolean).map((t) => TY_NAME[t] || t).join(', ');
+  function syncTySel() {
+    const v = $('f-ty').value, sel = v ? v.split(',') : [], btn = $('f-ty-btn');
+    document.querySelectorAll('#f-ty-pop input[type=checkbox]').forEach((c) => { c.checked = sel.includes(c.value); });
+    btn.textContent = !sel.length ? 'ทุกประเภท' : sel.length <= 2 ? tyLabel(v) : `${sel.length} ประเภท`;
+    btn.title = sel.length ? tyLabel(v) : 'ทุกประเภท'; btn.classList.toggle('active', !!sel.length);
+  }
+  function initTySel() {
+    const pop = $('f-ty-pop'), btn = $('f-ty-btn'), hid = $('f-ty');
+    if (btn.dataset.init) return; btn.dataset.init = '1';
+    const open = (on) => { pop.hidden = !on; btn.setAttribute('aria-expanded', String(on)); };
+    btn.addEventListener('click', (e) => { e.stopPropagation(); open(pop.hidden); });
+    pop.addEventListener('click', (e) => e.stopPropagation());
+    document.addEventListener('click', () => open(false));
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !pop.hidden) { open(false); btn.focus(); } });
+    const fire = () => { hid.dispatchEvent(new Event('change')); };
+    pop.addEventListener('change', () => { hid.value = [...pop.querySelectorAll('input:checked')].map((c) => c.value).join(','); fire(); });
+    pop.addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.all) { hid.value = ''; fire(); } if (b.dataset.close) { open(false); btn.focus(); } });
+  }
   const inR = (m, a, b) => m >= a && m <= b;
 
   // ---------- metrics ----------
@@ -412,6 +441,7 @@
     const why = (r) => {
       if (r.inst && r.inst >= startD) return { k: 'new', cls: 'info-line', t: `ติดตั้งมาตร ${dLabel(r.inst)} หลังวันเริ่มจดรอบนี้ (${METER_START} ${TH_M[mo - 1]}) — จะเริ่มจดรอบถัดไป` };
       if (r.ty === 'T2.2') return { k: 'pwa', cls: 'info-line', t: 'สัญญาขายส่ง กปภ. สิ้นสุดแล้ว — ทะเบียนยังเป็นสถานะใช้งาน' };
+      if (r.reg === MORGAN) return { k: 'manual', cls: 'warn-line', t: 'หมู่บ้านมอร์แกน — ใช้น้ำจริง จดหน่วยแบบแมนนวล ยังไม่ลงใน WMS · รอผู้บริหารพิจารณาวิธีลงระบบ' };
       if (r.binv) return { k: 'billed', cls: 'info-line', t: `ออกใบแจ้งหนี้รอบนี้แล้ว ${dLabel(r.binv)} ตามแบบฟอร์มของสัญญา (ไม่ผ่านการจดมาตรในระบบ)` };
       if (['T2.3', 'T3.1'].includes(r.ty) && !r.last) return { k: 'contract', cls: 'warn-line', t: `${r.ty === 'T2.3' ? 'หอถัง อบต.' : 'ลูกค้าสัญญา'} ไม่เคยจดผ่านระบบ และยังไม่มีใบแจ้งหนี้รอบนี้${r.inst ? ` · ติดตั้งมาตร ${dLabel(r.inst)}` : ''}${r.ncx ? ` · ใบแจ้งหนี้ถูกยกเลิก ${int(r.ncx)} ใบ (ล่าสุด ${dLabel(r.lcx)})` : ''} — ควรตรวจสอบ` };
       if (!r.last) return { k: 'never', cls: 'warn-line', t: `ยังไม่เคยจด${r.inst ? ` ทั้งที่ติดตั้งมาตรตั้งแต่ ${dLabel(r.inst)}` : ` (ลงทะเบียน ${dLabel(r.regd)})`}` };
@@ -422,10 +452,14 @@
     const back = pend.filter((r) => r.why.k === 'billed');
     pend.splice(0, pend.length, ...pend.filter((r) => r.why.k !== 'billed'));
     const nOut = back.length, readN = sm.read + nOut;
-    const nNew = pend.filter((r) => r.why.k === 'new').length;
-    const WHY_L = { new: 'ติดตั้งมาตรหลังวันเริ่มจด', pwa: 'สัญญา กปภ. สิ้นสุด', contract: 'ลูกค้าสัญญาไม่เคยจดผ่านระบบ', never: 'ยังไม่เคยจด', late: 'ค้างจดจากรอบปกติ' };
+    // ติดตั้งมาตรหลังวันเริ่มจด = ยังไม่ครบรอบ ไม่นับเป็นค้างจด และไม่นับในฐานทะเบียนที่ต้องจด (ฝ่ายกลยุทธ์ขอ 11/11/69)
+    const newL = pend.filter((r) => r.why.k === 'new'), nNew = newL.length;
+    pend.splice(0, pend.length, ...pend.filter((r) => r.why.k !== 'new'));
+    const base = sm.reg - nNew;
+    const newTxt = nNew ? `ไม่นับติดตั้งใหม่ ${int(nNew)} ราย (${newL.map((r) => r.reg).join(', ')}) — ติดตั้งหลังวันเริ่มจด จะเริ่มจดรอบถัดไป` : '';
+    const WHY_L = { new: 'ติดตั้งมาตรหลังวันเริ่มจด', pwa: 'สัญญา กปภ. สิ้นสุด', contract: 'ลูกค้าสัญญาไม่เคยจดผ่านระบบ', manual: 'จดแมนนวล ยังไม่ลงระบบ', never: 'ยังไม่เคยจด', late: 'ค้างจดจากรอบปกติ' };
     const whySum = Object.entries(WHY_L).map(([k, l]) => [l, pend.filter((r) => r.why.k === k).length]).filter(([, n]) => n).map(([l, n]) => `${l} ${n}`).join(' · ');
-    const nPend = Math.max(0, sm.reg - readN), pctRead = sm.reg ? readN / sm.reg : 0;
+    const nPend = Math.max(0, base - readN), pctRead = base ? readN / base : 0;
     const daysLeft = closed ? 0 : eom - refDay;
     const plan = (d) => (d < METER_START ? 0 : Math.min(1, (d - METER_START + 1) / (eom - METER_START + 1)));
     const pp = (v) => nf1.format(v * 100) + '%';
@@ -434,7 +468,7 @@
       kicker = `รอบ ${mLong(rnd)} · ปิดรอบ ${dLabel(eomD)}`;
       headline = nPend ? `จดครบ ${pp(pctRead)} — เหลือ ${int(nPend)} ทะเบียนที่ยังไม่ได้จด` : `จดครบ 100% ภายในกำหนด`;
       sub = `ออกใบแจ้งหนี้ค่าน้ำแล้ว ${int(sm.inv)} ใบ${sm.read_no_inv ? ` · อ่านแล้วยังไม่มีบิล ${int(sm.read_no_inv)} ราย` : ` · รับรู้รายได้ค่าน้ำเดือน ${TH_M[mo - 1]} แล้ว`}`;
-      badge = nPend ? { cls: 'bad', ic: '!', main: `เลยกำหนด ${delay} วัน`, sub: `${int(nPend)} ราย ยังไม่ได้จด${nNew ? ` (ติดตั้งใหม่ ${nNew})` : ''}` } : { cls: 'good', ic: '✓', main: 'จดครบ', sub: 'ตามกำหนด' };
+      badge = nPend ? { cls: 'bad', ic: '!', main: `เลยกำหนด ${delay} วัน`, sub: `${int(nPend)} ราย ยังไม่ได้จด` } : { cls: 'good', ic: '✓', main: 'จดครบ', sub: 'ตามกำหนด' };
     } else if (refDay < METER_START) {
       kicker = `รอบ ${mLong(rnd)} · วันที่ ${refDay}`; headline = `ยังไม่ถึงวันเริ่มจด — เริ่มวันที่ ${METER_START}`; sub = `ต้องจดครบ ${int(sm.reg)} ทะเบียนภายใน ${dLabel(eomD)}`;
       badge = { cls: 'info', ic: 'i', main: `อีก ${METER_START - refDay} วัน`, sub: 'เริ่มจดมาตร' };
@@ -454,6 +488,12 @@
     const AN = D.area_names || {};
     const aName = (id) => (id == null ? 'ไม่ระบุพื้นที่' : AN[id] || `พื้นที่ ${id}`);
     const aCell = (id) => `<span class="trunc" title="${esc(aName(id))}">${esc(aName(id))}</span>`;
+    // ที่ตั้งมาตร: "หมู่ N · ตำบล" (จาก 19_reg_moo) · ชื่อพื้นที่จดมาตรอยู่ใน tooltip · ไม่พบหมู่ใช้ชื่อพื้นที่แทน
+    const loc = (reg, area, br) => { const v = (S.regMoo || {})[reg]; if (!v) return null; const [m, tb] = v.split('|'); return { m, tb: tb || br }; };
+    const locCell = (r) => { const L = loc(r.reg, r.area, r.br);
+      if (!L || !L.m) return `${aCell(r.area)}<br><span class="muted small">${esc((L && L.tb) || r.br)}</span>`;
+      return `<span title="พื้นที่จดมาตร: ${esc(aName(r.area))}">หมู่ ${esc(L.m)} · ${esc(L.tb)}</span>`; };
+    const locV = (r) => { const L = loc(r.reg, r.area, r.br); return (L && L.m ? `หมู่ ${L.m} ${L.tb}` : `${(L && L.tb) || r.br}`) + ` (พื้นที่จดมาตร: ${aName(r.area)})`; };
     const areas = rowsOf({ cols: D.areas_cols, rows: D.areas || [] }), staff = rowsOf({ cols: D.staff_cols, rows: D.staff || [] }), wrong = rowsOf({ cols: D.wrong_cols, rows: D.wrong || [] });
     setTitle(`การจดมาตรและออกใบแจ้งหนี้ · รอบ ${mLong(rnd)}`);
     setScope(`จาก WMS · รอบ ${dLabel(D.round)} – ${dLabel(eomD)}`);
@@ -461,19 +501,19 @@
       <section class="hero" aria-label="สถานะรอบการจดมาตรและออกใบแจ้งหนี้">
         <div class="hero-top"><div class="hero-t"><span class="k">${esc(kicker)}</span><span class="h">${esc(headline)}</span><span class="s">${esc(sub)}</span></div>
           <div class="hero-badge ${badge.cls}"><span class="ic" aria-hidden="true">${badge.ic}</span><div><b>${esc(badge.main)}</b><small>${esc(badge.sub)}</small></div></div></div>
-        <div class="hero-prog"><div class="hp-l"><span>จดแล้ว <b>${int(readN)}</b> จาก ${int(sm.reg)} ทะเบียน</span><b>${pp(pctRead)}</b></div>
+        <div class="hero-prog"><div class="hp-l"><span>จดแล้ว <b>${int(readN)}</b> จาก ${int(base)} ทะเบียน${nNew ? ` <span class="small" style="opacity:.75">(ไม่นับติดตั้งใหม่ ${int(nNew)})</span>` : ''}</span><b>${pp(pctRead)}</b></div>
           <div class="hp-bar" role="img" aria-label="จดแล้ว ${pp(pctRead)}"><i style="width:${(pctRead * 100).toFixed(1)}%"></i>${!closed && refDay >= METER_START ? `<s style="left:${(plan(refDay) * 100).toFixed(1)}%" title="แผน ${pp(plan(refDay))}"></s>` : ''}</div></div>
         <div class="hero-tl" aria-label="ไทม์ไลน์รอบการจด"><div class="tl-line"></div><div class="tl-fill" style="width:${Math.min(100, pos(closed ? eom + delay : Math.max(1, refDay))).toFixed(1)}%"></div>
           ${marks.map(([d, t, c], i) => `<div class="tl-m ${c}${i === 0 ? ' first' : ''}${i === 3 && closed && delay > 0 ? ' late' : ''}" style="left:${pos(d).toFixed(1)}%"><span></span><em>${esc(t)}</em></div>`).join('')}</div>
       </section>
       <div class="kpis">
-        ${kpi('จดแล้ว / ทะเบียน', `${int(readN)}`, `/ ${int(sm.reg)}`, 'ทะเบียน = ผู้ใช้น้ำสถานะใช้งาน · อ่านแล้ว = มีรายการจดหน่วยน้ำในรอบ (ไม่ยกเลิก) นับ 1 ครั้งต่อทะเบียน + จดหลังบ้าน (ไม่มีรายการจด แต่มีใบแจ้งหนี้ค่าน้ำในเดือนของรอบตามแบบฟอร์มสัญญา)', [['ของทะเบียนใช้งาน', pp(pctRead), 'v-mute'], nOut ? ['จดหลังบ้าน (' + back.map((r) => esc(String(TY_NAME[r.ty] || r.reg).replace(/^T[\d.]+\s*/, ''))).join(', ') + ')', int(nOut) + ' ราย', 'v-mute'] : null, sm.read_inactive ? ['จดทะเบียนที่ไม่ใช่สถานะใช้งาน', int(sm.read_inactive) + ' ราย', 'v-mute'] : null], 'accent')}
-        ${kpi('ค้างจด', int(nPend), 'ราย', 'ทะเบียนใช้งานที่ยังไม่มีรายการจดในรอบ', [[closed ? 'ดีเลย์' : 'เหลือ', closed ? `เลยกำหนด ${delay} วัน (ณ ${dLabel(ref)})` : `${daysLeft} วัน`, nPend ? 'v-bad' : 'v-good']], nPend ? 'bad' : '')}
+        ${kpi('จดแล้ว / ทะเบียน', `${int(readN)}`, `/ ${int(base)}`, 'ทะเบียน = ผู้ใช้น้ำสถานะใช้งาน ไม่นับที่ติดตั้งมาตรหลังวันเริ่มจด · อ่านแล้ว = มีรายการจดหน่วยน้ำในรอบ (ไม่ยกเลิก) นับ 1 ครั้งต่อทะเบียน + จดหลังบ้าน (ไม่มีรายการจด แต่มีใบแจ้งหนี้ค่าน้ำในเดือนของรอบตามแบบฟอร์มสัญญา)', [['ของทะเบียนใช้งาน', pp(pctRead), 'v-mute'], nOut ? ['จดหลังบ้าน (' + back.map((r) => esc(String(TY_NAME[r.ty] || r.reg).replace(/^T[\d.]+\s*/, ''))).join(', ') + ')', int(nOut) + ' ราย', 'v-mute'] : null, nNew ? ['ติดตั้งใหม่ (ยังไม่ครบรอบ ไม่นับ)', int(nNew) + ' ราย', 'v-mute'] : null, sm.read_inactive ? ['จดทะเบียนที่ไม่ใช่สถานะใช้งาน', int(sm.read_inactive) + ' ราย', 'v-mute'] : null], 'accent')}
+        ${kpi('ค้างจด', int(nPend), 'ราย', `ทะเบียนใช้งานที่ยังไม่มีรายการจดในรอบ${nNew ? ' · ' + newTxt : ''}`, [[closed ? 'ดีเลย์' : 'เหลือ', closed ? `เลยกำหนด ${delay} วัน (ณ ${dLabel(ref)})` : `${daysLeft} วัน`, nPend ? 'v-bad' : 'v-good']], nPend ? 'bad' : '')}
         ${kpi('ออกใบแจ้งหนี้ค่าน้ำ', int(sm.inv), 'ใบ', 'ใบแจ้งหนี้ค่าน้ำที่ออกในเดือนของรอบ (ไม่ยกเลิก)', [['จากการจดในรอบ', int(sm.inv_from_read) + ' ใบ', 'v-mute'], ['อ่านแล้วแต่ยังไม่มีบิล', int(sm.read_no_inv) + ' ราย', sm.read_no_inv ? 'v-bad' : 'v-good']])}
         ${kpi('หน่วยน้ำผิดปกติ', int(sm.wrong), 'ราย', 'อ่านแล้วแต่หน่วยเกิน 200% หรือต่ำกว่า 20% ของค่าเฉลี่ย 3 เดือนก่อน (ตาม WMS)', [['สูงกว่า 200%', int(sm.wrong_hi) + ' ราย', 'v-warn'], ['ต่ำกว่า 20%', int(sm.wrong_lo) + ' ราย', 'v-warn']], '', { vcls: 'v-warn' })}
       </div>
       <div class="row">
-        ${card('c-mpend', 'ทะเบียนที่ยังไม่ได้จด', 'ต้องจดให้เสร็จภายในวันสิ้นเดือน · ดีเลย์ = วันอ้างอิง − วันสิ้นเดือน · เรียงจากดีเลย์มากไปน้อย', '', '<div id="t-mpend"></div>',
+        ${card('c-mpend', 'ทะเบียนที่ยังไม่ได้จด', `ต้องจดให้เสร็จภายในวันสิ้นเดือน · ดีเลย์ = วันอ้างอิง − วันสิ้นเดือน · เรียงจากดีเลย์มากไปน้อย${nNew ? ` · ไม่นับติดตั้งใหม่ ${int(nNew)} ราย` : ''}`, '', '<div id="t-mpend"></div>',
           { csv: 1, w: 1.4, min: 620, tools: nPend ? `<span class="pill ${closed ? 'down' : 'warn'}">⚠ ${int(nPend)} ราย${closed ? ' เลยกำหนด' : ''}</span>` : '',
             foot: `<span class="pill warn">เหลือ ≤ ${METER_WARN_DAYS} วัน</span> ใกล้ครบกำหนด · <span class="pill down">+N วัน</span> เลยกำหนดแล้ว — ยังออกบิลไม่ได้ รายได้เดือนนี้ไม่ครบ` })}
         ${card('c-mflow', 'จากจดมาตร ถึงรับรู้รายได้', `กระทบยอดใบแจ้งหนี้ค่าน้ำที่ออกในรอบ ${mLabel(rnd)}`, '', `<ol class="ilist mflow">
@@ -510,7 +550,7 @@
     $('t-mpend').innerHTML = pend.length ? table([
       { h: 'ทะเบียน', nw: 1, k: 'reg' },
       { h: 'ชื่อ / ประเภท · สาเหตุที่เป็นไปได้', cls: 'name', f: (r) => `${esc(r.name || '–')} <span class="muted small">· ${esc(TY_NAME[r.ty] || r.ty)}</span>` + (r.why.cls ? `<span class="${r.why.cls}">${r.why.cls === 'warn-line' ? '⚠ ' : 'ⓘ '}${esc(r.why.t)}</span>` : `<br><span class="muted small">${esc(r.why.t)}</span>`), v: (r) => `${r.name || ''} (${r.ty}) — ${r.why.t}` },
-      { h: 'พื้นที่', cls: 'area', f: (r) => `${aCell(r.area)}<br><span class="muted small">${esc(r.br)}</span>`, v: (r) => `${aName(r.area)} (${r.br})` },
+      { h: 'หมู่ · ตำบล', cls: 'area', f: locCell, v: locV },
       { h: 'พนักงานที่รับผิดชอบ', f: (r) => (r.staff ? esc(r.staff) : '<span class="muted small">ไม่มีผู้จดรอบก่อน</span>'), v: (r) => r.staff || '' },
       { h: 'ดีเลย์', nw: 1, f: (r) => (r.why.k === 'new' ? '<span class="pill na">ติดตั้งใหม่</span>' : r.why.k === 'billed' ? '<span class="pill up">ออกบิลแล้ว</span>' : sevPill(delay)) + `<br><span class="muted small">ครบกำหนด ${dLabel(eomD)}</span>`, v: (r) => (r.why.k === 'new' ? 'ติดตั้งใหม่' : r.why.k === 'billed' ? 'ออกบิลแล้ว' : delay) },
     ], pend) : '<div class="state">จดครบทุกทะเบียนแล้ว</div>';
@@ -560,7 +600,7 @@
       const cols = [
         { h: 'ทะเบียน', nw: 1, k: 'reg' },
         { h: 'ชื่อ / ประเภท', cls: 'name', f: (r) => `${esc(r.name || '–')} <span class="muted small">· ${esc(TY_NAME[r.ty] || r.ty)}</span>`, v: (r) => `${r.name || ''} (${r.ty})` },
-        { h: 'พื้นที่', cls: 'area', f: (r) => `${aCell(r.area)}<br><span class="muted small">${esc(r.br)}</span>`, v: (r) => `${aName(r.area)} (${r.br})` },
+        { h: 'หมู่ · ตำบล', cls: 'area', f: locCell, v: locV },
         { h: 'ใช้ 0 ติดกัน', nw: 1, f: (r) => `<span class="pill ${r.streak >= 6 ? 'down' : 'warn'}">${r.streak} รอบ</span><br><span class="muted small">ตั้งแต่ ${mLabel(r.since.slice(0, 7))}</span>`, v: (r) => r.streak },
         { h: 'ใช้ครั้งล่าสุด', nw: 1, f: (r) => (r.last_use ? mLabel(r.last_use.slice(0, 7)) : '<span class="muted small">ไม่พบตั้งแต่ ' + mLabel(MS.first_round.slice(0, 7)) + '</span>'), v: (r) => r.last_use || '' },
         { h: 'เฉลี่ยก่อนหยุด<br>ลบ.ม./เดือน', n: 1, f: (r) => (r.avg ? nf1.format(r.avg) + (r.weak ? '<br><span class="muted small" title="มีข้อมูลก่อนหยุดแค่รอบแรก (ส.ค. 68) ซึ่งอาจเป็นยอดสะสมตอนย้ายระบบ จึงไม่นำมาประมาณการ">ข้อมูลไม่พอ</span>' : '') : '–'), v: (r) => r.avg || '' },
@@ -602,7 +642,7 @@
     readTheme();
     disposeCharts();
     const meta = PAGE_META[S.page] || PAGE_META.snapshot;
-    document.querySelectorAll('#filters label[data-f]').forEach((l) => { l.hidden = !meta.f.includes(l.dataset.f); });
+    document.querySelectorAll('#filters [data-f]').forEach((l) => { l.hidden = !meta.f.includes(l.dataset.f); });
     $('f-to-l').textContent = meta.toL || 'ถึงเดือน';
     document.querySelector('.pf-links').hidden = !meta.f.length;
     $('head-tools').innerHTML = '';
@@ -743,7 +783,7 @@
       out.push({ lvl: 'bad', t: `ลูกหนี้เกินกำหนดสูงสุด: ${esc(d.name)} ${mb(d.overdue)} ล้านบาท`, d: `${pct(ar.overdue ? d.overdue / ar.overdue : null)} ของยอดเกินกำหนดทั้งหมด · ${d.n} ใบ · เก่าสุดครบกำหนด ${dLabel(d.oldest)}` });
     }
     const recent = monthsBetween(addM(S.lastFull, -5), S.lastFull).filter((m) => S.pwaMissing.includes(m));
-    if (recent.length && (!S.f.ty || S.f.ty === 'T2.2') && okBr('ไม้ขาว')) {
+    if (recent.length && okTy('T2.2') && okBr('ไม้ขาว')) {
       out.push({ lvl: 'warn', t: `กปภ. (T2.2) ไม่มีรายได้ ${recent.length} เดือน: ${recent.map(mLabel).join(', ')}`, d: 'พ.ค. 69 ไม่มีการส่งน้ำให้ กปภ. (ช่วงแล้ง) และสัญญาขายส่งสิ้นสุดหลัง ก.ค. 69 — รายได้หายราว 1.5–2 ล้านบาทต่อเดือน ต้องหาลูกค้าแทน (ดูหน้า “รายได้ตามกลุ่มลูกค้า”)' });
     }
     const lf = S.lastFull, ly = addM(lf, -12);
@@ -783,7 +823,7 @@
       </div>
       <div class="row">
         ${card('c-type', 'ยอดขายสุทธิตามประเภทลูกค้า', 'ล้านบาท · ประเภทตามทะเบียนผู้ใช้น้ำปัจจุบัน', 'ช่วงเดือน · สาขา (ตำบล) · ประเภทลูกค้า', '<div id="t-type"></div>', { csv: 1, min: 560 })}
-        ${card('c-moo2', 'ยอดค่าน้ำตามหมู่', 'ล้านบาท · เฉพาะใบแจ้งหนี้ค่าน้ำ (ไม่รวมงานขาย ใบลดหนี้ และลูกค้ารายใหญ่ระบบเดิม) · แต่ละตำบลแสดงเฉพาะหมู่ของตัวเอง', 'ช่วงเดือน · สาขา (ตำบล) · ประเภทลูกค้า · หมู่', '<div id="t-moo2"></div>', { csv: 1, min: 560, foot: 'หมู่ตามทะเบียนผู้ใช้น้ำ (ที่ตั้งมาตร) ถ้าทะเบียนไม่ระบุจึงใช้ที่อยู่ในใบแจ้งหนี้ · “ไม่ระบุหมู่” = ทะเบียนและใบแจ้งหนี้ไม่มีเลขหมู่ในตำบลไม้ขาว/สาคู · ยังไม่ใช้ DMA เพราะการผูก DMA ในทะเบียนยังไม่ครบ' })}
+        ${card('c-moo2', 'ยอดค่าน้ำตามหมู่', 'ล้านบาท · เฉพาะใบแจ้งหนี้ค่าน้ำ (ไม่รวมงานขาย ใบลดหนี้ และลูกค้ารายใหญ่ระบบเดิม) · แต่ละตำบลแสดงเฉพาะหมู่ของตัวเอง', 'ช่วงเดือน · สาขา (ตำบล) · ประเภทลูกค้า · หมู่', '<div id="t-moo2"></div>', { csv: 1, min: 560, foot: 'หมู่ตามทะเบียนผู้ใช้น้ำ (ที่ตั้งมาตร) ถ้าทะเบียนไม่ระบุหรือตำบลไม่ตรงจึงใช้ที่อยู่ในใบแจ้งหนี้ แล้วจึงชื่อพื้นที่จดมาตร · “ไม่ระบุหมู่” = ทะเบียนและใบแจ้งหนี้ไม่มีเลขหมู่ในตำบลไม้ขาว/สาคู · ยังไม่ใช้ DMA เพราะการผูก DMA ในทะเบียนยังไม่ครบ' })}
       </div>
       <div class="row">
         ${card('c-top', 'ลูกค้า 15 รายแรกตามยอดขาย 12 เดือนเต็มล่าสุด', `${dLabel(S.d.top_customers.window[0])} – ${dLabel(S.d.top_customers.window[1])} · ล้านบาท · <b>10 รายแรก = ${pct(S.d.top_customers.top10_net / S.d.top_customers.total_net)}</b> ของยอดขายค่าน้ำทุกสาขา (ไม่รวมงานขาย) · คลิกแถวเพื่อดูเอกสารต้นทาง`, 'สาขา (ตำบล) · ประเภทลูกค้า (ช่วงเดือนไม่มีผล)', '<div id="t-top"></div>', { csv: 1 })}
@@ -1125,14 +1165,14 @@
     const A = actionPlan().slice(0, 4);
     const kp = (label, v, unit, cmp, sub, cls = '') => `<div class="sk ${cls}"><div class="sk-l">${label}</div><div class="sk-v">${v}<small>${unit}</small></div>${cmp ? `<div class="sk-c">${cmp}</div>` : ''}${sub ? `<div class="sk-s">${sub}</div>` : ''}</div>`;
     const mm = (v) => nf2.format(v / 1e6);
-    const snapRow = (r) => `            <tr class="${r.g.cls || ''}"><td>${esc(r.g.name)}${r.g.k === 'PWA' && lastPwa && lastPwa < M ? `<br><small class="neg">บิลสุดท้าย ${mLabel(lastPwa)}</small>` : ''}</td><td class="n"><b>${mm(r.c.net)}</b></td><td class="n">${cmpCellV(r.c.net, r.p.net)}</td><td class="n">${cmpCellV(r.c.net, r.y.net)}</td>
+    const snapRow = (r) => `            <tr class="${r.g.cls || ''}"><td>${esc(r.g.name)}${r.g.k === 'HT' && morganMissing() ? ` <small class="note-w" title="${esc(MORGAN_TXT)}">⚠ ไม่รวม ม.มอร์แกน</small>` : ''}${r.g.k === 'PWA' && lastPwa && lastPwa < M ? `<br><small class="neg">บิลสุดท้าย ${mLabel(lastPwa)}</small>` : ''}</td><td class="n"><b>${mm(r.c.net)}</b></td><td class="n">${cmpCellV(r.c.net, r.p.net)}</td><td class="n">${cmpCellV(r.c.net, r.y.net)}</td>
             <td class="n">${r.c.units ? nf2.format(r.c.pnet / r.c.units) : '–'} <small class="muted">(${r.y.units ? nf2.format(r.y.pnet / r.y.units) : '–'})</small></td>
             <td class="n">${mm(r.a.net)}</td><td class="n">${cmpCellV(r.a.net, r.b.net)}</td><td class="n">${pct(ytd.net ? r.a.net / ytd.net : null)}</td>
             <td class="n">${r.g.cat === 'g' && r.c.cust ? int(r.c.net / r.c.cust) + ` <small class="muted">(${r.y.cust ? int(r.y.net / r.y.cust) : '–'})</small>` : '–'}</td>
             <td class="sp-cell">${spark(r.sp)}</td><td>${verdict(r.tr.l3, r.tr.l3y)}</td></tr>`;
     const ar7 = arAgg();
     const prioL = (p) => (p === 1 ? 'ควรพิจารณาก่อน' : p === 2 ? 'น่าพิจารณา' : 'ระยะยาว');
-    const scope = `${S.f.br ? 'ตำบล' + esc(S.f.br) : 'ไม้ขาว + สาคู'}${S.f.ty ? ' · ประเภท ' + esc(TY_NAME[S.f.ty] || S.f.ty) : ''} · ไม่รวม VAT`;
+    const scope = `${S.f.br ? 'ตำบล' + esc(S.f.br) : 'ไม้ขาว + สาคู'}${S.f.ty ? ' · ประเภท ' + esc(tyLabel(S.f.ty)) : ''} · ไม่รวม VAT`;
     setTitle(`Executive Snapshot · รายได้ประจำเดือน ${mLong(M)}`);
     $('head-tools').innerHTML = '<button type="button" class="btn" id="snap-print" title="พิมพ์หรือบันทึกเป็น PDF 2 หน้า A4 แนวนอน">พิมพ์ / บันทึก PDF (2 หน้า)</button>';
     const ph = (t, st, r) => `<header class="snap-h print-only"><div><div class="snap-t">${t}</div><div class="snap-st">${st}</div></div><div class="snap-asof">${r}</div></header>`;
@@ -1250,7 +1290,7 @@
     const pwaByM = {}; pwaMonths.forEach((r) => { pwaByM[r.m] = (pwaByM[r.m] || 0) + r.net; });
     const pm = Object.keys(pwaByM).sort().slice(-12), pwaAvg = pm.length ? sum(pm, (m) => pwaByM[m]) / pm.length : 0;
     const lastPwa = Object.keys(pwaByM).sort().pop();
-    if (okBr('ไม้ขาว') && (!S.f.ty || S.f.ty === 'T2.2') && lastPwa && lastPwa < S.lastFull)
+    if (okBr('ไม้ขาว') && okTy('T2.2') && lastPwa && lastPwa < S.lastFull)
       A.push({ p: 1, t: 'โอกาสทดแทนรายได้ขายส่ง กปภ. ที่หยุดไป', what: `แนวทางที่เป็นไปได้: เจรจาสัญญาขายส่งรอบใหม่ หรือนำน้ำส่วนที่เคยส่ง กปภ. ไปขายลูกค้า T3/โครงการใหม่ตามแนวท่อ (บิลสุดท้าย ${mLabel(lastPwa)})`,
         imp: `−${mb(pwaAvg * 12)} ล้านบาท/ปี ถ้าไม่ทดแทน`, own: 'ผู้บริหาร + ฝ่ายกลยุทธ์', kpi: 'ลบ.ม./วัน ไม่รวม กปภ. · รายได้ไม่รวม กปภ.', pg: 'revenue' });
     // (ตัดข้อเสนอเรื่องติดตามหนี้ออกตามที่ CSO ขอ 11/11/69 — ยังไม่มีผู้รับผิดชอบด้านนี้)
@@ -1396,7 +1436,7 @@
       <tr class="gh"><th rowspan="2">กลุ่มลูกค้า</th><th class="c-g gs" colspan="4">รายได้ (ล้านบาท)</th><th class="c-g gs" colspan="5">ปริมาณน้ำและราคาต่อหน่วย</th><th class="c-g gs" colspan="5">ลูกค้า</th></tr>
       <tr><th class="n gs">${L0}</th><th class="n">${L1}</th><th class="n">YoY</th><th class="n">สัดส่วน</th>
       <th class="n gs">ลบ.ม. ${L1}</th><th class="n">YoY</th><th class="n">สัดส่วน</th><th class="n">บาท/ลบ.ม. ${L0s}</th><th class="n">บาท/ลบ.ม. ${L1s}</th><th class="n gs">ราย ${L1}</th><th class="n">YoY</th><th class="n">สัดส่วน</th><th class="n">บาท/ราย/เดือน ${L0s}</th><th class="n">บาท/ราย/เดือน ${L1s}</th></tr></thead><tbody>
-      ${trs.map((r) => r.head ? `<tr class="grp"><td colspan="15">${r.head}</td></tr>` : `<tr class="${r.cls || ''}"><td>${esc(r.label)}${r.label.startsWith('กปภ') && pwaGap.length ? ` <span class="pill warn" title="${esc(pwaTxt(pwaGap))}">⚠ ไม่มีรายได้ ${pwaGap.length} เดือน</span>` : ''}</td>
+      ${trs.map((r) => r.head ? `<tr class="grp"><td colspan="15">${r.head}</td></tr>` : `<tr class="${r.cls || ''}"><td>${esc(r.label)}${r.label.startsWith('อบต.ไม้ขาว') && morganMissing() ? ` <span class="pill warn" title="${esc(MORGAN_TXT)}">⚠ ไม่รวม ม.มอร์แกน</span>` : ''}${r.label.startsWith('กปภ') && pwaGap.length ? ` <span class="pill warn" title="${esc(pwaTxt(pwaGap))}">⚠ ไม่มีรายได้ ${pwaGap.length} เดือน</span>` : ''}</td>
         <td class="n gs muted" ${mbv(r.b.net)}>${mb(r.b.net)}</td><td class="n" ${mbv(r.a.net)}><b>${mb(r.a.net)}</b></td><td class="n">${r.b.net ? pillChg(r.a.net, r.b.net) : '–'}</td><td class="n">${pct(t1 ? r.a.net / t1 : null)}</td>
         <td class="n gs">${r.a.units ? int(r.a.units) : '–'}</td><td class="n">${chgN(r.a.units, r.b.units)}</td><td class="n">${r.a.units && W1.units ? pct(r.a.units / W1.units) : '–'}</td><td class="n">${fmtPU(r.b.units ? r.b.wnet / r.b.units : null)}</td><td class="n">${fmtPU(r.a.units ? r.a.wnet / r.a.units : null)}</td>
         <td class="n gs">${r.a.cust ? int(r.a.cust) : '–'}</td><td class="n">${r.nc ? '<span class="muted" title="นับตามทะเบียนมาตร ปีก่อนบางรายออกบิลรวมใบเดียว — ไม่เทียบจำนวนราย">–</span>' : chgN(r.a.cust, r.b.cust)}</td><td class="n">${r.a.cust && W1.cust ? pct(r.a.cust / W1.cust) : '–'}</td><td class="n">${r.np ? '<span class="muted" title="ปีก่อนออกบิลรวมทะเบียนเดียว — ไม่เทียบรายได้ต่อราย">–</span>' : r.b.cm ? int(r.b.net / r.b.cm) : '–'}</td><td class="n">${r.a.cm ? int(r.a.net / r.a.cm) : '–'}</td></tr>`).join('')}
@@ -1467,7 +1507,7 @@
         ${card('c-brg', 'รายได้แยกตำบล × กลุ่มลูกค้า', `ล้านบาท · ${per} เทียบปีก่อน · สาขาไม้ขาว = ตำบลไม้ขาว, สาขาสาคู = ตำบลสาคู`, 'ช่วงเดือน · สาขา (ตำบล) · ประเภทลูกค้า', brTbl, { csv: 1 })}
       </div>
       <div class="row">
-        ${card('c-moo', 'รายได้ลูกค้าทั่วไปแยกหมู่', 'บาท · หมู่ตามทะเบียนผู้ใช้น้ำ (ที่ตั้งมาตร) ถ้าทะเบียนไม่ระบุจึงใช้ที่อยู่ในใบแจ้งหนี้ (ไม่รวมลูกค้าสัญญารายใหญ่) · “ไม่ระบุหมู่” = ทะเบียนและใบแจ้งหนี้ไม่มีเลขหมู่ในตำบลไม้ขาว/สาคู · แถบ YoY ตัดที่ ±50%', 'ช่วงเดือน · สาขา (ตำบล) · ประเภทลูกค้า · หมู่', '<div id="t-moo"></div>', { csv: 1 })}
+        ${card('c-moo', 'รายได้ลูกค้าทั่วไปแยกหมู่', 'บาท · หมู่ตามทะเบียนผู้ใช้น้ำ (ที่ตั้งมาตร) ถ้าทะเบียนไม่ระบุหรือตำบลไม่ตรงจึงใช้ที่อยู่ในใบแจ้งหนี้ แล้วจึงชื่อพื้นที่จดมาตร (ไม่รวมลูกค้าสัญญารายใหญ่) · “ไม่ระบุหมู่” = ทะเบียนและใบแจ้งหนี้ไม่มีเลขหมู่ในตำบลไม้ขาว/สาคู · แถบ YoY ตัดที่ ±50%', 'ช่วงเดือน · สาขา (ตำบล) · ประเภทลูกค้า · หมู่', '<div id="t-moo"></div>', { csv: 1 })}
       </div>
       <div class="row">
         ${card('c-ins', 'สรุปข้อสังเกต (Insight)', 'สรุปจากตัวเลขทั้งหน้าตามตัวกรองที่เลือก', 'ช่วงเดือน · สาขา (ตำบล) · ประเภทลูกค้า', `<ul class="ilist">${ins.map(([l, t, d]) => `<li><span class="ic ${l}" aria-hidden="true">${l === 'bad' ? '!' : l === 'warn' ? '⚠' : 'i'}</span><div><div class="t1">${esc(t)}</div><div class="d">${esc(d)}</div></div></li>`).join('')}</ul>`, { min: 520 })}

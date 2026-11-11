@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>HEA Sales Executive Dashboard</title>
-<script src="theme.js?v=mwbwx2j6"></script>
-<link rel="stylesheet" href="styles.css?v=mwbwx2j6">
-<link rel="stylesheet" href="gate.css?v=mwbwx2j6">
+<script src="theme.js?v=mwc07bws"></script>
+<link rel="stylesheet" href="styles.css?v=mwc07bws">
+<link rel="stylesheet" href="gate.css?v=mwc07bws">
 </head>
 <body>
 <div class="lock" id="lock">
@@ -56,7 +56,7 @@
         <label data-f="from">ตั้งแต่เดือน<select id="f-from"></select></label>
         <label data-f="to"><span id="f-to-l">ถึงเดือน</span><select id="f-to"></select></label>
         <label data-f="br">สาขา (ตำบล)<select id="f-br"></select></label>
-        <label data-f="ty">ประเภทลูกค้า<select id="f-ty"></select></label>
+        <div class="flbl" data-f="ty"><span id="f-ty-l">ประเภทลูกค้า</span><div class="msel"><button type="button" class="msel-btn" id="f-ty-btn" aria-haspopup="true" aria-expanded="false" aria-labelledby="f-ty-l f-ty-btn">ทุกประเภท</button><div class="msel-pop" id="f-ty-pop" role="group" aria-label="เลือกประเภทลูกค้า (เลือกได้หลายประเภท)" hidden></div><input type="hidden" id="f-ty" value=""></div></div>
         <label data-f="moo">หมู่<select id="f-moo"></select></label>
         <label data-f="asof">วันอ้างอิงลูกหนี้<input type="date" id="f-asof"></label>
         <div class="pf-links">
@@ -85,12 +85,12 @@
   <div id="drill-body"></div>
 </dialog>
 
-<script src="vendor/echarts.min.js?v=mwbwx2j6"></script>
+<script src="vendor/echarts.min.js?v=mwc07bws"></script>
 <script>window.HEA_STATIC = 1;</script>
-<script src="vendor/msal-browser.min.js?v=mwbwx2j6"></script>
-<script src="auth-config.js?v=mwbwx2j6"></script>
-<script src="data.enc.js?v=mwbwx2j6"></script>
-<script src="app.js?v=mwbwx2j6"></script>
-<script src="gate.js?v=mwbwx2j6"></script>
+<script src="vendor/msal-browser.min.js?v=mwc07bws"></script>
+<script src="auth-config.js?v=mwc07bws"></script>
+<script src="data.enc.js?v=mwc07bws"></script>
+<script src="app.js?v=mwc07bws"></script>
+<script src="gate.js?v=mwc07bws"></script>
 </body>
 </html>

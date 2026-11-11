@@ -33,7 +33,7 @@ const DATASETS = {
   usage_compare: '14_usage_compare.sql',
   meter_reading: '16_meter_reading.sql',
   meter_stuck: '17_meter_stuck.sql',
-  cust_months: '18_cust_months.sql',
+  cust_months: '18_cust_months.sql', reg_moo: '19_reg_moo.sql',
 };
 const NO_PARAMS = new Set(['meta']);
 // ข้อมูลเสริมที่ไม่ได้อยู่ในฐานข้อมูล (ไฟล์ใน data/) — ใช้ทั้งโหมดสดและ snapshot
