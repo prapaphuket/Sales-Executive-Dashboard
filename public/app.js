@@ -36,7 +36,8 @@
   const morganMissing = () => !(S.cm || []).some((r) => r.reg === MORGAN && r.u.some((v) => typeof v === 'number' && v > 0));
   const MORGAN_TXT = 'ยังไม่รวมหมู่บ้านมอร์แกน (AR00C-03022) — ใช้น้ำจริง จดหน่วยไว้นอกระบบ ยังไม่ได้ลงใน WMS';
   const TY_NAME = { T1: 'T1', T2: 'T2', 'T2.1': 'T2.1 ตำรวจภูธรภาค 8', 'T2.2': 'T2.2 กปภ.', 'T2.3': 'T2.3 อบต. (หอถังสูง)', T3: 'T3', 'T3.1': 'T3.1 ทอท.', 'ชั่วคราว-ไม้ขาว': 'ชั่วคราว', '?': 'ไม่ระบุ/รอตรวจสอบ' };
-  const CH_NAME = { transfer: 'โอน', direct: 'หักบัญชี', cash: 'เงินสด', cheque: 'เช็ค', scan: 'สแกนจ่าย', '?': 'ไม่ระบุ' };
+  // qr = ลูกค้าสแกน QR บนใบแจ้งหนี้ จ่ายผ่านแอปธนาคาร (ระบบบันทึกใบเสร็จเอง) · ยืนยัน 11/11/69
+  const CH_NAME = { qr: 'สแกน QR (แอปธนาคาร)', epay: 'E-Payment', transfer: 'โอน', direct: 'ชำระตรง (พนักงานบันทึก)', cash: 'เงินสด', cheque: 'เช็ค', scan: 'สแกน QR', '?': 'ไม่ระบุ' };
   const KIND_NAME = { water: 'ค่าน้ำ', water_legacy: 'ค่าน้ำ', fee: 'งานขาย/บริการ', bond: 'เงินประกัน' };
 
   // ---------- format ----------
@@ -1064,7 +1065,7 @@
       { h: 'ใบเสร็จ', n: 1, f: (r) => int(r.n) }, { h: 'ยอด 0', n: 1, f: (r) => int(r.z) },
     ], chrows, ['รวม', { h: `${mb(coll.total)} 100%`, v: round2(coll.total) }, int(coll.n), int(coll.zero)]);
     const chN = chrows.slice().sort((a, b) => b.n - a.n)[0], chZ = chrows.slice().sort((a, b) => b.z - a.z)[0];
-    if ($('ch-foot') && chN) $('ch-foot').innerHTML = `${esc(CH_NAME[chN.ch] || chN.ch)}มีใบเสร็จมากที่สุด (${int(chN.n)} ใบ) เฉลี่ย ${int(chN.amt / Math.max(1, chN.n))} บาท/ใบ${chZ && chZ.z ? ` · ${esc(CH_NAME[chZ.ch] || chZ.ch)}มีใบยอด 0 มากสุด ${int(chZ.z)} ใบ` : ''}`;
+    if ($('ch-foot') && chN) $('ch-foot').innerHTML = `${esc(CH_NAME[chN.ch] || chN.ch)} มีใบเสร็จมากที่สุด (${int(chN.n)} ใบ) เฉลี่ย ${int(chN.amt / Math.max(1, chN.n))} บาท/ใบ${chZ && chZ.z ? ` · ${esc(CH_NAME[chZ.ch] || chZ.ch)} มีใบยอด 0 มากสุด ${int(chZ.z)} ใบ` : ''}`;
 
     const arRows = AGING.map((g) => ({ g, amt: ar.b[g.k], n: sum(ar.rows.filter((r) => r.bk === g.k), (r) => r.n), leg: sum(ar.rows.filter((r) => r.bk === g.k && r.legacy), (r) => r.amt) }));
     $('t-ar').innerHTML = table([
