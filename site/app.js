@@ -544,7 +544,7 @@
           '<div id="t-mstuck"></div><div id="t-mstuck-all" hidden></div>', { csv: 1, csvLabel: 'CSV (ครบทุกราย)' })}
       </div>
       <div class="row">
-        ${card('c-marea', 'ความคืบหน้าตามพื้นที่การอ่านมาตร', 'ทะเบียนใช้งาน · พื้นที่ที่ยังค้างขึ้นก่อน · ชื่อพื้นที่จาก WMS (ชื่อยาวชี้เมาส์เพื่อดูเต็ม)', '', '<div id="t-marea"></div>', { csv: 1 })}
+        ${card('c-marea', 'ความคืบหน้าตามพื้นที่การอ่านมาตร', 'ทั้งหมด = ทะเบียนที่ต้องจด (นิยามเดียวกับการ์ดด้านบน) · จดได้ รวมบันทึกที่สำนักงาน · ถูกตัดมาตร = งดจ่ายน้ำที่ไม่ได้จดในรอบ · พื้นที่ที่ยังค้างขึ้นก่อน · ชื่อยาวชี้เมาส์เพื่อดูเต็ม', '', '<div id="t-marea"></div>', { csv: 1 })}
       </div>
       <section class="card rules"><h3>กติกาและนิยาม</h3><ul>
         <li>เริ่มจดมาตรวันที่ <b>${METER_START}</b> ของเดือน และต้องจด<b>ครบภายในวันสิ้นเดือน</b> เพื่อออกใบแจ้งหนี้และรับรู้รายได้ในเดือนนั้น</li>
@@ -575,6 +575,9 @@
     chart($('ch-mday'), { xAxis: catAxis(shown.map((x) => String(x.d))), yAxis: { ...valAxis((v) => nf0.format(v * 100) + '%'), max: 1 }, series: ds, tooltip: { ...chartTT(), valueFormatter: (v) => pp(v) } });
     chartTable('c-mday', shown.map((x) => `${x.d} ${TH_M[mo - 1]} (${int(x.n)} ราย)`), ds.map((x) => ({ name: x.name, data: x.data })), 'p');
     // ตามพื้นที่
+    // ปรับให้ตรงกับการ์ดหลัก: ไม่นับติดตั้งใหม่ในทั้งหมด · บันทึกที่สำนักงาน (ทอท.) นับว่าจดได้ → ค้างรวม = ค้างจดในการ์ดหลัก
+    areas.forEach((r) => { r.all -= newL.filter((x) => x.area === r.area).length; const nb = back.filter((x) => x.area === r.area).length; r.read += nb; r.inv += nb; });
+    areas.sort((a, b) => (b.all - b.read) - (a.all - a.read)); areas.splice(0, areas.length, ...areas.filter((r) => r.all > 0));
     $('t-marea').innerHTML = table([
       { h: 'พื้นที่', cls: 'area', f: (r) => aCell(r.area), v: (r) => aName(r.area) }, { h: 'ทั้งหมด', n: 1, f: (r) => int(r.all) }, { h: 'จดได้', n: 1, f: (r) => int(r.read) },
       { h: 'ค้าง', n: 1, f: (r) => (r.all - r.read > 0 ? `<b class="v-bad">${int(r.all - r.read)}</b>` : '<span class="muted">0</span>'), v: (r) => r.all - r.read }, { h: 'ถูกตัดมาตร', n: 1, f: (r) => int(r.cut) }, { h: 'ออกใบแจ้งหนี้', n: 1, f: (r) => int(r.inv) },

@@ -69,8 +69,9 @@ select json_build_object(
               where cw.status = 'active' and rd.id is null),
   'areas_cols', json_build_array('area', 'br', 'all', 'read', 'cut', 'inv'),
   'areas', (select json_agg(json_build_array(area, br, n_all, n_read, n_cut, n_inv) order by (n_all - n_read) desc, area)
-            from (select cw.area, min(b.name) br, count(*) filter (where cw.status = 'active') n_all,
-                         count(rd.id) filter (where cw.status = 'active') n_read, count(*) filter (where cw.status = 'disconnected') n_cut,
+            -- ทั้งหมด = ทะเบียนใช้งาน + ทะเบียนที่จดในรอบแล้วถูกงดจ่ายน้ำภายหลัง · ถูกตัดมาตร = งดจ่ายน้ำที่ไม่ได้จดในรอบ (ปรับ 11/11/69 ให้ตรงกับการ์ดหลัก)
+            from (select cw.area, min(b.name) br, count(*) filter (where cw.status = 'active' or rd.id is not null) n_all,
+                         count(rd.id) n_read, count(*) filter (where cw.status = 'disconnected' and rd.id is null) n_cut,
                          count(rd.id) filter (where rd.id in (select wid from inv)) n_inv
                   from cw left join rd on rd.customer_water_id = cw.id left join branches b on b.id = cw.branch_id
                   where cw.status in ('active', 'disconnected') group by cw.area) x where n_all > 0),
