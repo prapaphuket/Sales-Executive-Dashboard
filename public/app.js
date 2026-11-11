@@ -449,12 +449,12 @@
       return { k: 'late', cls: '', t: `จดล่าสุด ${dLabel(r.last)}` };
     };
     pend.forEach((r) => { r.why = why(r); });
-    // จดหลังบ้าน (มีใบแจ้งหนี้ค่าน้ำในเดือนของรอบตามแบบฟอร์มสัญญา) = นับว่าจดแล้ว และไม่แสดงในรายการค้างจด
+    // บันทึกที่สำนักงาน (มีใบแจ้งหนี้ค่าน้ำในเดือนของรอบตามแบบฟอร์มสัญญา) = นับว่าจดแล้ว และไม่แสดงในรายการค้างจด
     const back = pend.filter((r) => r.why.k === 'billed');
     pend.splice(0, pend.length, ...pend.filter((r) => r.why.k !== 'billed'));
-    // นิยาม (ยืนยัน 11/11/69): จด = บันทึกเลขแล้วออกใบแจ้งหนี้ทันทีจากเครื่องโมบาย · จดหลังบ้าน = ทอท. (ไม่ผ่านเครื่อง)
+    // นิยาม (ยืนยัน 11/11/69): จด = บันทึกเลขแล้วออกใบแจ้งหนี้ทันทีจากเครื่องโมบาย · บันทึกที่สำนักงาน = ทอท. (ไม่ผ่านเครื่อง)
     // ทะเบียนที่จดในรอบแล้วถูกงดจ่ายน้ำภายหลัง (สถานะไม่ใช่ใช้งาน ณ วันดึงข้อมูล) ยังนับว่าจดแล้ว และนับในฐานทะเบียนที่ต้องจด
-    // → จดผ่านเครื่อง + จดหลังบ้าน = ใบแจ้งหนี้ค่าน้ำในรอบ
+    // → จดผ่านเครื่อง + บันทึกที่สำนักงาน = ใบแจ้งหนี้ค่าน้ำในรอบ
     const nCutAfter = sm.read_inactive || 0, nMob = sm.read + nCutAfter;
     const nOut = back.length, readN = nMob + nOut;
     // ติดตั้งมาตรหลังวันเริ่มจด = ยังไม่ครบรอบ ไม่นับเป็นค้างจด และไม่นับในฐานทะเบียนที่ต้องจด (ฝ่ายกลยุทธ์ขอ 11/11/69)
@@ -500,6 +500,9 @@
       return `<span title="พื้นที่จดมาตร: ${esc(aName(r.area))}">หมู่ ${esc(L.m)} · ${esc(L.tb)}</span>`; };
     const locV = (r) => { const L = loc(r.reg, r.area, r.br); return (L && L.m ? `หมู่ ${L.m} ${L.tb}` : `${(L && L.tb) || r.br}`) + ` (พื้นที่จดมาตร: ${aName(r.area)})`; };
     const areas = rowsOf({ cols: D.areas_cols, rows: D.areas || [] }), staff = rowsOf({ cols: D.staff_cols, rows: D.staff || [] }), wrong = rowsOf({ cols: D.wrong_cols, rows: D.wrong || [] });
+    // ช่องทางจด (ตรวจ 11/11/69): รายการจดที่มีพิกัด GPS = จดหน้างานด้วยเครื่องโมบาย · ไม่มีพิกัด = คีย์จากเคาน์เตอร์ที่สำนักงาน · ทอท. = ไม่มีรายการจด (ออกบิลตามแบบฟอร์มสัญญา)
+    const hasGps = staff.length && staff.every((r) => r.gps != null);
+    const nGps = hasGps ? sum(staff, (r) => r.gps) : null, nKey = hasGps ? sum(staff, (r) => r.read) - nGps : 0;
     setTitle(`การจดมาตรและออกใบแจ้งหนี้ · รอบ ${mLong(rnd)}`);
     setScope(`จาก WMS · รอบ ${dLabel(D.round)} – ${dLabel(eomD)}`);
     el.innerHTML = `
@@ -512,9 +515,9 @@
           ${marks.map(([d, t, c], i) => `<div class="tl-m ${c}${i === 0 ? ' first' : ''}${i === 3 && closed && delay > 0 ? ' late' : ''}" style="left:${pos(d).toFixed(1)}%"><span></span><em>${esc(t)}</em></div>`).join('')}</div>
       </section>
       <div class="kpis">
-        ${kpi('จดแล้ว / ทะเบียน', `${int(readN)}`, `/ ${int(base)}`, `จดแล้ว = จดผ่านเครื่องโมบาย (บันทึกเลขแล้วออกใบแจ้งหนี้ทันที) + จดหลังบ้าน (ทอท.) = ใบแจ้งหนี้ค่าน้ำในรอบ · ทะเบียน = ผู้ใช้น้ำสถานะใช้งาน ไม่นับที่ติดตั้งมาตรหลังวันเริ่มจด${nCutAfter ? ` รวม ${int(nCutAfter)} รายที่งดจ่ายน้ำหลังจดในรอบ` : ''}`, [['ของทะเบียนที่ต้องจด', pp(pctRead), 'v-mute'], ['จดผ่านเครื่องโมบาย', int(nMob) + ' ราย', 'v-mute'], nOut ? ['จดหลังบ้าน (' + back.map((r) => esc(String(TY_NAME[r.ty] || r.reg).replace(/^T[\d.]+\s*/, ''))).join(', ') + ')', int(nOut) + ' ราย', 'v-mute'] : null, nNew ? ['ติดตั้งใหม่ (ยังไม่ครบรอบ ไม่นับ)', int(nNew) + ' ราย', 'v-mute'] : null], 'accent')}
+        ${kpi('จดแล้ว / ทะเบียน', `${int(readN)}`, `/ ${int(base)}`, `จดแล้ว = ทุกทะเบียนที่มีการจดหน่วยในรอบ ไม่ว่าจดหน้างานหรือสำนักงาน = ใบแจ้งหนี้ค่าน้ำในรอบ${hasGps ? ' · หน้างาน = รายการจดที่มีพิกัด GPS จากเครื่องโมบาย · สำนักงาน = คีย์จากเคาน์เตอร์ (ไม่มีพิกัด) และ ทอท. (ออกบิลตามแบบฟอร์มสัญญา)' : ''} · ทะเบียน = ผู้ใช้น้ำสถานะใช้งาน ไม่นับที่ติดตั้งมาตรหลังวันเริ่มจด${nCutAfter ? ` รวม ${int(nCutAfter)} รายที่งดจ่ายน้ำหลังจดในรอบ` : ''}`, [['ของทะเบียนที่ต้องจด', pp(pctRead), 'v-mute'], hasGps ? ['จดหน้างาน (เครื่องโมบาย)', int(nGps) + ' ราย', 'v-mute'] : null, hasGps && (nKey + nOut) ? ['บันทึกที่สำนักงาน', `${int(nKey + nOut)} ราย`, 'v-mute'] : null, nNew ? ['ติดตั้งใหม่ (ยังไม่ครบรอบ ไม่นับ)', int(nNew) + ' ราย', 'v-mute'] : null], 'accent')}
         ${kpi('ค้างจด', int(nPend), 'ราย', `ทะเบียนใช้งานที่ยังไม่มีรายการจดในรอบ${nNew ? ' · ' + newTxt : ''}`, [[closed ? 'ดีเลย์' : 'เหลือ', closed ? `เลยกำหนด ${delay} วัน (ณ ${dLabel(ref)})` : `${daysLeft} วัน`, nPend ? 'v-bad' : 'v-good']], nPend ? 'bad' : '')}
-        ${kpi('ออกใบแจ้งหนี้ค่าน้ำ', int(sm.inv), 'ใบ', 'ใบแจ้งหนี้ค่าน้ำที่ออกในเดือนของรอบ (ไม่ยกเลิก) · ควรเท่ากับจำนวนที่จดแล้ว', [['จากเครื่องโมบาย', int(sm.inv_from_read) + ' ใบ', 'v-mute'], sm.inv_no_read ? ['จดหลังบ้าน (ทอท.)', int(sm.inv_no_read) + ' ใบ', 'v-mute'] : null, ['จดแล้วแต่ยังไม่มีบิล', int(sm.read_no_inv) + ' ราย', sm.read_no_inv ? 'v-bad' : 'v-good']])}
+        ${kpi('ออกใบแจ้งหนี้ค่าน้ำ', int(sm.inv), 'ใบ', 'ใบแจ้งหนี้ค่าน้ำที่ออกในเดือนของรอบ (ไม่ยกเลิก) · ควรเท่ากับจำนวนที่จดแล้ว', [['จากรายการจดในระบบ', int(sm.inv_from_read) + ' ใบ', 'v-mute'], sm.inv_no_read ? ['ทอท. (แบบฟอร์มสัญญา)', int(sm.inv_no_read) + ' ใบ', 'v-mute'] : null, ['จดแล้วแต่ยังไม่มีบิล', int(sm.read_no_inv) + ' ราย', sm.read_no_inv ? 'v-bad' : 'v-good']])}
         ${kpi('หน่วยน้ำผิดปกติ', int(sm.wrong), 'ราย', 'อ่านแล้วแต่หน่วยเกิน 200% หรือต่ำกว่า 20% ของค่าเฉลี่ย 3 เดือนก่อน (ตาม WMS)', [['สูงกว่า 200%', int(sm.wrong_hi) + ' ราย', 'v-warn'], ['ต่ำกว่า 20%', int(sm.wrong_lo) + ' ราย', 'v-warn']], '', { vcls: 'v-warn' })}
       </div>
       <div class="row">
@@ -523,8 +526,8 @@
             foot: `<span class="pill warn">เหลือ ≤ ${METER_WARN_DAYS} วัน</span> ใกล้ครบกำหนด · <span class="pill down">+N วัน</span> เลยกำหนดแล้ว — ยังออกบิลไม่ได้ รายได้เดือนนี้ไม่ครบ` })}
         ${card('c-mflow', 'จากจดมาตร ถึงรับรู้รายได้', `กระทบยอดใบแจ้งหนี้ค่าน้ำที่ออกในรอบ ${mLabel(rnd)}`, '', `<ol class="ilist mflow">
             <li><span class="no">1</span><div><div class="t1">ทะเบียนที่ต้องจด</div><div class="d">ผู้ใช้น้ำสถานะใช้งาน ${int(sm.reg)}${nNew ? ` − ติดตั้งใหม่ ${int(nNew)}` : ''}${nCutAfter ? ` + งดจ่ายน้ำหลังจดในรอบ ${int(nCutAfter)}` : ''} · งดจ่ายน้ำ ${int(sm.cut)} ราย ไม่นับ</div></div><span class="mv">${int(base)}</span></li>
-            <li><span class="no">2</span><div><div class="t1">จดมาตรแล้ว</div><div class="d">${dLabel(sm.first_read)} – ${dLabel(sm.last_read)} · เครื่องโมบาย ${int(nMob)}${nOut ? ` + จดหลังบ้าน (ทอท.) ${int(nOut)}` : ''}${nPend ? ` · ค้างจด ${int(nPend)}` : ''}</div></div><span class="mv">${int(readN)}</span></li>
-            <li><span class="no">3</span><div><div class="t1">ออกใบแจ้งหนี้ค่าน้ำ</div><div class="d">จากเครื่องโมบาย ${int(sm.inv_from_read)} · จดหลังบ้าน/ไม่ผ่านเครื่อง ${int(sm.inv_no_read)}${sm.inv === readN ? ' · เท่ากับจำนวนที่จดแล้ว ✓' : ` · ต่างจากจำนวนที่จด ${int(sm.inv - readN)}`}</div></div><span class="mv">${int(sm.inv)}</span></li>
+            <li><span class="no">2</span><div><div class="t1">จดมาตรแล้ว</div><div class="d">${dLabel(sm.first_read)} – ${dLabel(sm.last_read)} ${hasGps ? ` · หน้างาน ${int(nGps)} + สำนักงาน ${int(nKey + nOut)}${nOut ? ` (คีย์ในระบบ ${int(nKey)} · ทอท. ${int(nOut)})` : ''}` : ''}${nPend ? ` · ค้างจด ${int(nPend)}` : ''}</div></div><span class="mv">${int(readN)}</span></li>
+            <li><span class="no">3</span><div><div class="t1">ออกใบแจ้งหนี้ค่าน้ำ</div><div class="d">จากรายการจดในระบบ ${int(sm.inv_from_read)} · ทอท. (แบบฟอร์มสัญญา) ${int(sm.inv_no_read)}${sm.inv === readN ? ' · เท่ากับจำนวนที่จดแล้ว ✓' : ` · ต่างจากจำนวนที่จด ${int(sm.inv - readN)}`}</div></div><span class="mv">${int(sm.inv)}</span></li>
           </ol>
           ${sm.read_no_inv ? `<div class="note-box bad"><span class="ic">!</span><div>อ่านแล้วแต่ยังไม่มีใบแจ้งหนี้ <b>${int(sm.read_no_inv)} ราย</b> — ตรวจใน WMS ก่อนปิดเดือน</div></div>`
             : `<div class="note-box good"><span class="ic">✓</span><div>อ่านแล้วแต่ยังไม่มีใบแจ้งหนี้ = 0 ราย — ทุกมาตรที่จดแล้วออกบิลครบ${water ? ` · รายได้ค่าน้ำ ${mLabel(rnd)} ${mb(water)} ล้านบาท (ไม่รวม VAT)` : ''}</div></div>`}`, { w: 1, min: 440 })}
@@ -547,7 +550,8 @@
         <li>เริ่มจดมาตรวันที่ <b>${METER_START}</b> ของเดือน และต้องจด<b>ครบภายในวันสิ้นเดือน</b> เพื่อออกใบแจ้งหนี้และรับรู้รายได้ในเดือนนั้น</li>
         <li><b>ดีเลย์ (วัน)</b> = วันอ้างอิง − วันสิ้นเดือนของรอบ (บวก = เลยกำหนด) · เหลือ ≤ ${METER_WARN_DAYS} วันแต่ยังค้าง = เหลือง “ใกล้ครบกำหนด” (เกณฑ์ ${METER_WARN_DAYS} วันรอยืนยัน)</li>
         <li><b>ทะเบียน</b> = ผู้ใช้น้ำสถานะใช้งาน (สถานะปัจจุบัน ระบบไม่เก็บประวัติสถานะรายวัน) · <b>อ่านแล้ว</b> = มีรายการจดหน่วยน้ำในรอบ (ไม่ยกเลิก) นับ 1 ครั้งต่อทะเบียน · <b>ค้างอ่าน</b> = ทะเบียน − อ่านแล้ว</li>
-        <li><b>จดหลังบ้าน</b> = ทะเบียนที่ไม่มีรายการจดในระบบ แต่มีใบแจ้งหนี้ค่าน้ำในเดือนของรอบตามแบบฟอร์มสัญญา (เช่น ทอท.) — นับว่าจดแล้ว ไม่แสดงในรายการค้างจด · ตรวจจากใบแจ้งหนี้ทุกเดือน</li>
+        <li><b>จดหน้างาน</b> = รายการจดที่มีพิกัด GPS จากเครื่องโมบาย (บันทึกเลขแล้วออกใบแจ้งหนี้ทันที)</li>
+        <li><b>บันทึกที่สำนักงาน</b> = รายการจดที่คีย์จากเคาน์เตอร์ (ไม่มีพิกัด) และทะเบียนที่ไม่มีรายการจดแต่มีใบแจ้งหนี้ค่าน้ำในเดือนของรอบตามแบบฟอร์มสัญญา (ทอท.) — นับว่าจดแล้ว · จดหน้างาน + บันทึกที่สำนักงาน = ใบแจ้งหนี้ค่าน้ำในรอบ</li>
         <li><b>หน่วยน้ำผิดปกติ</b> = ค่าที่ WMS ตั้งไว้ในรายการจด: เกิน 200% หรือต่ำกว่า 20% ของค่าเฉลี่ย 3 เดือนก่อน</li>
         <li>ตัวเลขอาจต่างจากแผงควบคุมใน WMS ได้เล็กน้อย เพราะดึงจากฐานข้อมูลสำรอง ณ ${dLabel(S.asof)} และใช้สถานะทะเบียน ณ วันที่ดึง</li>
       </ul></section>`;
@@ -584,7 +588,8 @@
       { h: 'พนักงาน', nw: 1, k: 'staff' }, { h: 'พื้นที่', n: 1, f: (r) => int(r.areas) },
       { h: 'จดได้ (ทะเบียน)', n: 1, f: (r) => `<b>${int(r.read)}</b>`, v: (r) => r.read },
       { h: 'สัดส่วนที่จดได้', cls: 'bar-cell', f: (r) => barCell(`<b>${pp(sTot ? r.read / sTot : 0)}</b>`, r.read, sMax), v: (r) => (sTot ? round2(r.read / sTot * 100) : '') },
-    ], stf, ['รวม (เครื่องโมบาย)', '', int(sTot), '100%']) + (nOut ? `<div class="muted small" style="margin-top:6px">+ จดหลังบ้าน (ทอท.) ${int(nOut)} ราย = จดแล้วทั้งหมด ${int(sTot + nOut)} ราย${sm.inv === sTot + nOut ? ' = ใบแจ้งหนี้ค่าน้ำในรอบ ✓' : ''}</div>` : '');
+    ].concat(hasGps ? [{ h: 'ช่องทาง', nw: 1, f: (r) => (r.gps === r.read ? '<span class="muted">หน้างาน</span>' : !r.gps ? '<span class="pill na">สำนักงาน</span>' : `<span class="muted">หน้างาน ${int(r.gps)} · </span><span class="pill na">สำนักงาน ${int(r.read - r.gps)}</span>`), v: (r) => (r.gps === r.read ? 'หน้างาน' : !r.gps ? 'สำนักงาน' : `หน้างาน ${r.gps} / สำนักงาน ${r.read - r.gps}`) }] : []),
+    stf, ['รวม', '', int(sTot), '100%'].concat(hasGps ? [`หน้างาน ${int(nGps)} · สำนักงาน ${int(nKey)}`] : [])) + (nOut ? `<div class="muted small" style="margin-top:6px">+ ทอท. ออกบิลตามแบบฟอร์มสัญญา (ไม่มีรายการจด) ${int(nOut)} ราย = จดแล้วทั้งหมด ${int(sTot + nOut)} ราย${sm.inv === sTot + nOut ? ' = ใบแจ้งหนี้ค่าน้ำในรอบ ✓' : ''}${hasGps ? ' · หน้างาน = มีพิกัด GPS จากเครื่องโมบาย · สำนักงาน = คีย์จากเคาน์เตอร์ (ไม่มีพิกัด)' : ''}</div>` : '');
     // หน่วยผิดปกติ
     $('t-mwrong').innerHTML = table([
       { h: 'ทะเบียน', nw: 1, k: 'reg' }, { h: 'ชื่อ', cls: 'name', f: (r) => esc(r.name || '–') }, { h: 'ประเภท', nw: 1, f: (r) => esc(TY_NAME[r.ty] || r.ty) }, { h: 'วันที่จด', nw: 1, f: (r) => dLabel(r.date), v: (r) => r.date },

@@ -76,11 +76,13 @@ select json_build_object(
                   where cw.status in ('active', 'disconnected') group by cw.area) x where n_all > 0),
   -- ชื่อพื้นที่การอ่านมาตร (ต้อง GRANT SELECT ON meter_reading_areas TO mcp_reader — migrations/002)
   'area_names', (select json_object_agg(id, trim(title)) from meter_reading_areas where deleted_at is null),
-  'staff_cols', json_build_array('staff', 'areas', 'assigned', 'read'),
-  'staff', (select json_agg(json_build_array(sn, areas, assigned, nread) order by nread desc)
+  -- gps = รายการจดที่มีพิกัด (จดผ่านเครื่องโมบายหน้างาน) · ไม่มีพิกัด = คีย์จากสำนักงาน/เคาน์เตอร์ (ตรวจ 11/11/69)
+  'staff_cols', json_build_array('staff', 'areas', 'assigned', 'read', 'gps'),
+  'staff', (select json_agg(json_build_array(sn, areas, assigned, nread, ngps) order by nread desc)
             from (select s.sn, count(distinct cw.area) areas,
                          count(distinct p.customer_water_id) filter (where cw.status = 'active') assigned,
-                         (select count(*) from rd where rd.user_id = s.user_id) nread
+                         (select count(*) from rd where rd.user_id = s.user_id) nread,
+                         (select count(*) from rd where rd.user_id = s.user_id and nullif(trim(rd.lat), '') is not null and rd.lat <> '0') ngps
                   from staff s join prev_rd p on p.user_id = s.user_id join cw on cw.id = p.customer_water_id
                   group by s.user_id, s.sn) x where nread > 0 or assigned > 0),
   'wrong_cols', json_build_array('reg', 'name', 'ty', 'date', 'prev', 'cur', 'units', 'avg3', 'pct'),
