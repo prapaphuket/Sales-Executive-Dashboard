@@ -527,7 +527,7 @@
       </div>
       <div class="row">
         ${card('c-mday', 'ความคืบหน้ารายวัน', `% จดสะสมของทะเบียนใช้งาน เทียบเส้นแผน (เริ่ม ${METER_START} → ครบ 100% วันสิ้นเดือน)`, '', '<div class="chart" id="ch-mday" style="height:260px"></div>', { table: 1, w: 1, min: 520, foot: 'แท่งสีส้ม = ต่ำกว่าแผน · นับตามวันที่จดในรายการจดหน่วยน้ำ' })}
-        ${card('c-mstaff', 'พนักงานอ่านมาตร', 'มอบหมาย = ทะเบียนที่พนักงานคนนั้นจดในรอบก่อน (ระบบไม่มีตารางมอบหมายเส้นทาง) · ชื่อย่อเพื่อความเป็นส่วนตัว', '', '<div id="t-mstaff"></div>', { csv: 1, w: 1, min: 520 })}
+        ${card('c-mstaff', 'พนักงานอ่านมาตร', 'จำนวนทะเบียนที่แต่ละคนจดได้ในรอบ และสัดส่วนของที่จดได้ทั้งหมด · ชื่อย่อเพื่อความเป็นส่วนตัว', '', '<div id="t-mstaff"></div>', { csv: 1, w: 1, min: 520 })}
       </div>
       <div class="row">
         ${card('c-mwrong', 'หน่วยน้ำผิดปกติ', `${int(sm.wrong)} ราย ในรอบนี้ · แสดง 20 รายที่ต่างจากค่าเฉลี่ยมากที่สุด (ลบ.ม.) · รายการทั้งหมดดูได้ใน WMS แผงควบคุมงานอ่านมาตร`, '', '<div id="t-mwrong"></div>', { csv: 1 })}
@@ -573,12 +573,14 @@
       { h: 'ความคืบหน้า', cls: 'bar-cell', f: (r) => barCell(pp(r.all ? r.read / r.all : 0), r.all ? r.read / r.all : 0, 1, r.all - r.read > 0 ? C.orange : C.navy), v: (r) => pp(r.all ? r.read / r.all : 0) },
     ], areas, ['รวม', int(sum(areas, (r) => r.all)), int(sum(areas, (r) => r.read)), int(sum(areas, (r) => r.all - r.read)), int(sum(areas, (r) => r.cut)), int(sum(areas, (r) => r.inv)), '']);
     // พนักงาน
-    const sMax = Math.max(1, ...staff.map((r) => Math.max(r.assigned, r.read)));
+    // ระบบมอบหมายเส้นทางยังใช้ไม่เต็มที่ → แสดงจำนวนที่จดได้และสัดส่วนต่อยอดจดทั้งหมด (ปรับ 11/11/69)
+    const sTot = sum(staff, (r) => r.read), sMax = Math.max(1, ...staff.map((r) => r.read));
+    const stf = staff.slice().sort((a, b) => b.read - a.read);
     $('t-mstaff').innerHTML = table([
-      { h: 'พนักงาน', nw: 1, k: 'staff' }, { h: 'พื้นที่', n: 1, f: (r) => int(r.areas) }, { h: 'มอบหมาย', n: 1, f: (r) => int(r.assigned) },
-      { h: 'อ่านแล้ว', cls: 'bar-cell', f: (r) => barCell(`<b>${int(r.read)}</b>`, r.read, sMax), v: (r) => r.read },
-      { h: 'คงเหลือ', n: 1, f: (r) => (r.assigned - r.read > 0 ? `<b class="v-bad">${int(r.assigned - r.read)}</b>` : '<span class="muted">0</span>'), v: (r) => Math.max(0, r.assigned - r.read) },
-    ], staff, ['รวม', '', int(sum(staff, (r) => r.assigned)), int(sum(staff, (r) => r.read)), '']);
+      { h: 'พนักงาน', nw: 1, k: 'staff' }, { h: 'พื้นที่', n: 1, f: (r) => int(r.areas) },
+      { h: 'จดได้ (ทะเบียน)', n: 1, f: (r) => `<b>${int(r.read)}</b>`, v: (r) => r.read },
+      { h: 'สัดส่วนที่จดได้', cls: 'bar-cell', f: (r) => barCell(`<b>${pp(sTot ? r.read / sTot : 0)}</b>`, r.read, sMax), v: (r) => (sTot ? round2(r.read / sTot * 100) : '') },
+    ], stf, ['รวม', '', int(sTot), '100%']);
     // หน่วยผิดปกติ
     $('t-mwrong').innerHTML = table([
       { h: 'ทะเบียน', nw: 1, k: 'reg' }, { h: 'ชื่อ', cls: 'name', f: (r) => esc(r.name || '–') }, { h: 'ประเภท', nw: 1, f: (r) => esc(TY_NAME[r.ty] || r.ty) }, { h: 'วันที่จด', nw: 1, f: (r) => dLabel(r.date), v: (r) => r.date },
