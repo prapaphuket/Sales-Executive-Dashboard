@@ -654,3 +654,14 @@ td.area{max-width:260px;width:260px}
 
 /* บรรทัดข้อสังเกต (ข้อมูล ไม่ใช่คำเตือน) ใต้ชื่อในตาราง · กล่องหมายเหตุแบบข้อมูล */
 .info-line { display: block; margin-top: 4px; padding: 3px 8px; border-radius: 6px; background: var(--muted-bg); color: var(--text-2); font-size: 12px; line-height: 1.45; }
+
+/* มิเตอร์ไม่หมุน: แถว KPI ย่อย + แถบตามจำนวนรอบ */
+.ms-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:10px}
+.ms-k{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--subtle-bg)}
+.ms-k .l{font-size:13px;color:var(--text-2)} .ms-k .v{font-size:24px;font-weight:700;color:var(--heading)} .ms-k .v small{font-size:13px;font-weight:500;color:var(--text-2)}
+.ms-k .s{font-size:12px;color:var(--text-3);margin-top:2px} .ms-k.bad .v{color:var(--status-bad)}
+.ms-bars{display:grid;gap:6px;max-width:560px}
+.ms-b{display:grid;grid-template-columns:90px 1fr 70px;align-items:center;gap:8px;font-size:13px}
+.ms-b i{display:block;height:12px;border-radius:3px;background:var(--status-bad);min-width:2px} .ms-b b{text-align:right}
+.snap-t-tbl .dmil { display: inline-block; margin-right: 6px; font-size: 11px; font-weight: 500; opacity: .85; }
+@media print { .snap-t-tbl .dmil { margin-right: 4px; font-size: 9.5px; } .snap-t-tbl td { padding-top: 3px; padding-bottom: 3px; } }

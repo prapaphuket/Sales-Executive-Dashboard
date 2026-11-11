@@ -6,7 +6,7 @@ w as (select (date_trunc('month', e1) - interval '3 months')::date s1, e1, (date
              date_trunc('year', e1)::date ys, (date_trunc('year', e1) - interval '1 year')::date ys0 from p),
 cw as (select c.id, c.registration_number reg, c.status, c.personal_type, c.branch_id, split_part(t.name, ' - ', 1) ty
        from vw_dash_customer_waters c left join customer_water_types t on t.id = c.type_id),
-gen as (select * from cw where coalesce(ty, '?') not in ('T2.2', 'T2.3', 'T3.1')),
+gen as (select * from cw where coalesce(ty, '?') not in ('T2.2', 'T3.1')),   -- หอถัง อบต. (T2.3) นับเป็นลูกค้าทั่วไป (11/11/69)
 first_bill as (select customer_water_id cw, min(issue_date) fb, max(issue_date) lb from record_invoices where status <> 'cancelled' group by 1),
 inv as (select distinct on (i.invoice_number, i.customer_water_id, i.issue_date, i.total, i.water_unit) i.*
         from record_invoices i, w where i.status <> 'cancelled' and i.issue_date between w.ys0 and w.e1
@@ -22,7 +22,7 @@ nm as (select w.id cw, coalesce(i.customer_name, nullif(trim(w.name), '')) custo
        left join (select distinct on (customer_water_id) customer_water_id, customer_name from record_invoices where status <> 'cancelled' order by customer_water_id, issue_date desc, id desc) i on i.customer_water_id = w.id),
 monthly as (
   select to_char(i.issue_date, 'YYYY-MM') m, coalesce(b.name, 'ไม่ระบุ') br,
-         sum(i.water_unit) filter (where coalesce(g.ty, '?') not in ('T2.2', 'T2.3', 'T3.1') and fb.fb < w.ys) q_exist,
+         sum(i.water_unit) filter (where coalesce(g.ty, '?') not in ('T2.2', 'T3.1') and fb.fb < w.ys) q_exist,
          sum(i.water_unit) filter (where coalesce(g.ty, '?') <> 'T2.2') q_excl_pwa,
          sum(i.water_unit) q_all
   from inv i cross join w left join cw g on g.id = i.customer_water_id left join first_bill fb on fb.cw = i.customer_water_id left join branches b on b.id = i.branch_id
