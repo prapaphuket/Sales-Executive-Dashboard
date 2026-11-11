@@ -452,11 +452,15 @@
     // จดหลังบ้าน (มีใบแจ้งหนี้ค่าน้ำในเดือนของรอบตามแบบฟอร์มสัญญา) = นับว่าจดแล้ว และไม่แสดงในรายการค้างจด
     const back = pend.filter((r) => r.why.k === 'billed');
     pend.splice(0, pend.length, ...pend.filter((r) => r.why.k !== 'billed'));
-    const nOut = back.length, readN = sm.read + nOut;
+    // นิยาม (ยืนยัน 11/11/69): จด = บันทึกเลขแล้วออกใบแจ้งหนี้ทันทีจากเครื่องโมบาย · จดหลังบ้าน = ทอท. (ไม่ผ่านเครื่อง)
+    // ทะเบียนที่จดในรอบแล้วถูกงดจ่ายน้ำภายหลัง (สถานะไม่ใช่ใช้งาน ณ วันดึงข้อมูล) ยังนับว่าจดแล้ว และนับในฐานทะเบียนที่ต้องจด
+    // → จดผ่านเครื่อง + จดหลังบ้าน = ใบแจ้งหนี้ค่าน้ำในรอบ
+    const nCutAfter = sm.read_inactive || 0, nMob = sm.read + nCutAfter;
+    const nOut = back.length, readN = nMob + nOut;
     // ติดตั้งมาตรหลังวันเริ่มจด = ยังไม่ครบรอบ ไม่นับเป็นค้างจด และไม่นับในฐานทะเบียนที่ต้องจด (ฝ่ายกลยุทธ์ขอ 11/11/69)
     const newL = pend.filter((r) => r.why.k === 'new'), nNew = newL.length;
     pend.splice(0, pend.length, ...pend.filter((r) => r.why.k !== 'new'));
-    const base = sm.reg - nNew;
+    const base = sm.reg - nNew + nCutAfter;
     const newTxt = nNew ? `ไม่นับติดตั้งใหม่ ${int(nNew)} ราย (${newL.map((r) => r.reg).join(', ')}) — ติดตั้งหลังวันเริ่มจด จะเริ่มจดรอบถัดไป` : '';
     const WHY_L = { new: 'ติดตั้งมาตรหลังวันเริ่มจด', pwa: 'สัญญา กปภ. สิ้นสุด', contract: 'ลูกค้าสัญญาไม่เคยจดผ่านระบบ', manual: 'จดแมนนวล ยังไม่ลงระบบ', never: 'ยังไม่เคยจด', late: 'ค้างจดจากรอบปกติ' };
     const whySum = Object.entries(WHY_L).map(([k, l]) => [l, pend.filter((r) => r.why.k === k).length]).filter(([, n]) => n).map(([l, n]) => `${l} ${n}`).join(' · ');
@@ -508,9 +512,9 @@
           ${marks.map(([d, t, c], i) => `<div class="tl-m ${c}${i === 0 ? ' first' : ''}${i === 3 && closed && delay > 0 ? ' late' : ''}" style="left:${pos(d).toFixed(1)}%"><span></span><em>${esc(t)}</em></div>`).join('')}</div>
       </section>
       <div class="kpis">
-        ${kpi('จดแล้ว / ทะเบียน', `${int(readN)}`, `/ ${int(base)}`, 'ทะเบียน = ผู้ใช้น้ำสถานะใช้งาน ไม่นับที่ติดตั้งมาตรหลังวันเริ่มจด · อ่านแล้ว = มีรายการจดหน่วยน้ำในรอบ (ไม่ยกเลิก) นับ 1 ครั้งต่อทะเบียน + จดหลังบ้าน (ไม่มีรายการจด แต่มีใบแจ้งหนี้ค่าน้ำในเดือนของรอบตามแบบฟอร์มสัญญา)', [['ของทะเบียนใช้งาน', pp(pctRead), 'v-mute'], nOut ? ['จดหลังบ้าน (' + back.map((r) => esc(String(TY_NAME[r.ty] || r.reg).replace(/^T[\d.]+\s*/, ''))).join(', ') + ')', int(nOut) + ' ราย', 'v-mute'] : null, nNew ? ['ติดตั้งใหม่ (ยังไม่ครบรอบ ไม่นับ)', int(nNew) + ' ราย', 'v-mute'] : null, sm.read_inactive ? ['จดทะเบียนที่ไม่ใช่สถานะใช้งาน', int(sm.read_inactive) + ' ราย', 'v-mute'] : null], 'accent')}
+        ${kpi('จดแล้ว / ทะเบียน', `${int(readN)}`, `/ ${int(base)}`, `จดแล้ว = จดผ่านเครื่องโมบาย (บันทึกเลขแล้วออกใบแจ้งหนี้ทันที) + จดหลังบ้าน (ทอท.) = ใบแจ้งหนี้ค่าน้ำในรอบ · ทะเบียน = ผู้ใช้น้ำสถานะใช้งาน ไม่นับที่ติดตั้งมาตรหลังวันเริ่มจด${nCutAfter ? ` รวม ${int(nCutAfter)} รายที่งดจ่ายน้ำหลังจดในรอบ` : ''}`, [['ของทะเบียนที่ต้องจด', pp(pctRead), 'v-mute'], ['จดผ่านเครื่องโมบาย', int(nMob) + ' ราย', 'v-mute'], nOut ? ['จดหลังบ้าน (' + back.map((r) => esc(String(TY_NAME[r.ty] || r.reg).replace(/^T[\d.]+\s*/, ''))).join(', ') + ')', int(nOut) + ' ราย', 'v-mute'] : null, nNew ? ['ติดตั้งใหม่ (ยังไม่ครบรอบ ไม่นับ)', int(nNew) + ' ราย', 'v-mute'] : null], 'accent')}
         ${kpi('ค้างจด', int(nPend), 'ราย', `ทะเบียนใช้งานที่ยังไม่มีรายการจดในรอบ${nNew ? ' · ' + newTxt : ''}`, [[closed ? 'ดีเลย์' : 'เหลือ', closed ? `เลยกำหนด ${delay} วัน (ณ ${dLabel(ref)})` : `${daysLeft} วัน`, nPend ? 'v-bad' : 'v-good']], nPend ? 'bad' : '')}
-        ${kpi('ออกใบแจ้งหนี้ค่าน้ำ', int(sm.inv), 'ใบ', 'ใบแจ้งหนี้ค่าน้ำที่ออกในเดือนของรอบ (ไม่ยกเลิก)', [['จากการจดในรอบ', int(sm.inv_from_read) + ' ใบ', 'v-mute'], ['อ่านแล้วแต่ยังไม่มีบิล', int(sm.read_no_inv) + ' ราย', sm.read_no_inv ? 'v-bad' : 'v-good']])}
+        ${kpi('ออกใบแจ้งหนี้ค่าน้ำ', int(sm.inv), 'ใบ', 'ใบแจ้งหนี้ค่าน้ำที่ออกในเดือนของรอบ (ไม่ยกเลิก) · ควรเท่ากับจำนวนที่จดแล้ว', [['จากเครื่องโมบาย', int(sm.inv_from_read) + ' ใบ', 'v-mute'], sm.inv_no_read ? ['จดหลังบ้าน (ทอท.)', int(sm.inv_no_read) + ' ใบ', 'v-mute'] : null, ['จดแล้วแต่ยังไม่มีบิล', int(sm.read_no_inv) + ' ราย', sm.read_no_inv ? 'v-bad' : 'v-good']])}
         ${kpi('หน่วยน้ำผิดปกติ', int(sm.wrong), 'ราย', 'อ่านแล้วแต่หน่วยเกิน 200% หรือต่ำกว่า 20% ของค่าเฉลี่ย 3 เดือนก่อน (ตาม WMS)', [['สูงกว่า 200%', int(sm.wrong_hi) + ' ราย', 'v-warn'], ['ต่ำกว่า 20%', int(sm.wrong_lo) + ' ราย', 'v-warn']], '', { vcls: 'v-warn' })}
       </div>
       <div class="row">
@@ -518,9 +522,9 @@
           { csv: 1, w: 1.4, min: 620, tools: nPend ? `<span class="pill ${closed ? 'down' : 'warn'}">⚠ ${int(nPend)} ราย${closed ? ' เลยกำหนด' : ''}</span>` : '',
             foot: `<span class="pill warn">เหลือ ≤ ${METER_WARN_DAYS} วัน</span> ใกล้ครบกำหนด · <span class="pill down">+N วัน</span> เลยกำหนดแล้ว — ยังออกบิลไม่ได้ รายได้เดือนนี้ไม่ครบ` })}
         ${card('c-mflow', 'จากจดมาตร ถึงรับรู้รายได้', `กระทบยอดใบแจ้งหนี้ค่าน้ำที่ออกในรอบ ${mLabel(rnd)}`, '', `<ol class="ilist mflow">
-            <li><span class="no">1</span><div><div class="t1">ทะเบียนใช้งาน</div><div class="d">ผู้ใช้น้ำสถานะใช้งาน ณ วันที่ดึงข้อมูล · งดจ่ายน้ำ ${int(sm.cut)} ราย ไม่นับ</div></div><span class="mv">${int(sm.reg)}</span></li>
-            <li><span class="no">2</span><div><div class="t1">จดมาตรแล้ว</div><div class="d">${dLabel(sm.first_read)} – ${dLabel(sm.last_read)}${nOut ? ` · รวมจดหลังบ้านตามสัญญา ${int(nOut)} ราย` : ''}${sm.read_inactive ? ` · จดทะเบียนที่ไม่ใช่สถานะใช้งานอีก ${int(sm.read_inactive)} ราย` : ''}</div></div><span class="mv">${int(readN)}</span></li>
-            <li><span class="no">3</span><div><div class="t1">ออกใบแจ้งหนี้ค่าน้ำ</div><div class="d">จากการจดในรอบ ${int(sm.inv_from_read)} · ไม่มีการจดในรอบ (สร้างเอง/นำเข้า) ${int(sm.inv_no_read)}</div></div><span class="mv">${int(sm.inv)}</span></li>
+            <li><span class="no">1</span><div><div class="t1">ทะเบียนที่ต้องจด</div><div class="d">ผู้ใช้น้ำสถานะใช้งาน ${int(sm.reg)}${nNew ? ` − ติดตั้งใหม่ ${int(nNew)}` : ''}${nCutAfter ? ` + งดจ่ายน้ำหลังจดในรอบ ${int(nCutAfter)}` : ''} · งดจ่ายน้ำ ${int(sm.cut)} ราย ไม่นับ</div></div><span class="mv">${int(base)}</span></li>
+            <li><span class="no">2</span><div><div class="t1">จดมาตรแล้ว</div><div class="d">${dLabel(sm.first_read)} – ${dLabel(sm.last_read)} · เครื่องโมบาย ${int(nMob)}${nOut ? ` + จดหลังบ้าน (ทอท.) ${int(nOut)}` : ''}${nPend ? ` · ค้างจด ${int(nPend)}` : ''}</div></div><span class="mv">${int(readN)}</span></li>
+            <li><span class="no">3</span><div><div class="t1">ออกใบแจ้งหนี้ค่าน้ำ</div><div class="d">จากเครื่องโมบาย ${int(sm.inv_from_read)} · จดหลังบ้าน/ไม่ผ่านเครื่อง ${int(sm.inv_no_read)}${sm.inv === readN ? ' · เท่ากับจำนวนที่จดแล้ว ✓' : ` · ต่างจากจำนวนที่จด ${int(sm.inv - readN)}`}</div></div><span class="mv">${int(sm.inv)}</span></li>
           </ol>
           ${sm.read_no_inv ? `<div class="note-box bad"><span class="ic">!</span><div>อ่านแล้วแต่ยังไม่มีใบแจ้งหนี้ <b>${int(sm.read_no_inv)} ราย</b> — ตรวจใน WMS ก่อนปิดเดือน</div></div>`
             : `<div class="note-box good"><span class="ic">✓</span><div>อ่านแล้วแต่ยังไม่มีใบแจ้งหนี้ = 0 ราย — ทุกมาตรที่จดแล้วออกบิลครบ${water ? ` · รายได้ค่าน้ำ ${mLabel(rnd)} ${mb(water)} ล้านบาท (ไม่รวม VAT)` : ''}</div></div>`}`, { w: 1, min: 440 })}
@@ -558,9 +562,9 @@
     if (pend.length) $('t-mpend').insertAdjacentHTML('afterbegin', `<div class="info-line" style="margin:0 0 10px;font-size:13px;padding:6px 10px">ⓘ <b>สาเหตุที่เป็นไปได้:</b> ${esc(whySum)}</div>`);
     // รายวัน (สะสม)
     const byDay = {}; (D.daily || []).forEach(([d, n]) => { byDay[+d.slice(8, 10)] = n; });
-    const dlist = []; let cum = 0; for (let d = METER_START; d <= eom; d++) { cum += byDay[d] || 0; dlist.push({ d, v: sm.reg ? cum / sm.reg : 0, n: byDay[d] || 0 }); }
+    const dlist = []; let cum = 0; for (let d = METER_START; d <= eom; d++) { cum += byDay[d] || 0; dlist.push({ d, v: base ? cum / base : 0, n: byDay[d] || 0 }); }
     const early = sum(Object.keys(byDay).filter((d) => +d < METER_START), (d) => byDay[d]);
-    if (early) dlist.forEach((x) => { x.v += early / sm.reg; });
+    if (early) dlist.forEach((x) => { x.v += early / base; });
     const shown = dlist.filter((x) => closed || x.d <= refDay);
     const ds = [{ name: 'จดสะสม', type: 'bar', barMaxWidth: 26, itemStyle: { borderRadius: [3, 3, 0, 0], color: (p) => (shown[p.dataIndex] && shown[p.dataIndex].v + 1e-9 < plan(shown[p.dataIndex].d) ? C.orange : C.navy) }, data: shown.map((x) => Math.round(x.v * 1000) / 1000) },
       { name: 'แผน', type: 'line', noPulse: true, symbol: 'none', lineStyle: { type: 'dashed', width: 2, color: C.text2 }, itemStyle: { color: C.text2 }, data: shown.map((x) => Math.round(plan(x.d) * 1000) / 1000) }];
@@ -580,7 +584,7 @@
       { h: 'พนักงาน', nw: 1, k: 'staff' }, { h: 'พื้นที่', n: 1, f: (r) => int(r.areas) },
       { h: 'จดได้ (ทะเบียน)', n: 1, f: (r) => `<b>${int(r.read)}</b>`, v: (r) => r.read },
       { h: 'สัดส่วนที่จดได้', cls: 'bar-cell', f: (r) => barCell(`<b>${pp(sTot ? r.read / sTot : 0)}</b>`, r.read, sMax), v: (r) => (sTot ? round2(r.read / sTot * 100) : '') },
-    ], stf, ['รวม', '', int(sTot), '100%']);
+    ], stf, ['รวม (เครื่องโมบาย)', '', int(sTot), '100%']) + (nOut ? `<div class="muted small" style="margin-top:6px">+ จดหลังบ้าน (ทอท.) ${int(nOut)} ราย = จดแล้วทั้งหมด ${int(sTot + nOut)} ราย${sm.inv === sTot + nOut ? ' = ใบแจ้งหนี้ค่าน้ำในรอบ ✓' : ''}</div>` : '');
     // หน่วยผิดปกติ
     $('t-mwrong').innerHTML = table([
       { h: 'ทะเบียน', nw: 1, k: 'reg' }, { h: 'ชื่อ', cls: 'name', f: (r) => esc(r.name || '–') }, { h: 'ประเภท', nw: 1, f: (r) => esc(TY_NAME[r.ty] || r.ty) }, { h: 'วันที่จด', nw: 1, f: (r) => dLabel(r.date), v: (r) => r.date },
