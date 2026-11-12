@@ -7,7 +7,7 @@ cw as (select c.id, c.branch_id, c.dma_id, split_part(t.name, ' - ', 1) ty from 
 inv as (  -- ตัดแถวซ้ำที่เหมือนกันทุกค่า (เลขเอกสาร ลูกค้า วันที่ ยอด หน่วย) เหลือแถวเดียว
   select distinct on (i.invoice_number, i.customer_water_id, i.issue_date, i.total, i.water_unit) i.*
   from record_invoices i
-  where i.status <> 'cancelled' and i.issue_date between $1::date and $2::date
+  where i.status <> 'cancelled' and not exists (select 1 from vw_dash_credit_notes zr where zr.record_invoice_id = i.id and coalesce(zr.status, '') <> 'cancelled' and zr.total >= i.total - 0.01) and i.issue_date between $1::date and $2::date
   order by i.invoice_number, i.customer_water_id, i.issue_date, i.total, i.water_unit, i.id),
 w as (
   select to_char(i.issue_date, 'YYYY-MM') m, i.branch_id, coalesce(cw.ty, '?') ty, 'W' src,
@@ -37,9 +37,9 @@ f as (
   group by 1, 2, 3),
 c as (
   select to_char(n.issue_date, 'YYYY-MM') m, n.branch_id, coalesce(cw.ty, '?') ty, 'C' src,
-         count(*) docs, -sum(n.total - n.vat) wat, 0::numeric svc, 0::numeric disc, null::numeric units, null::numeric free_units, -sum(n.vat) vat_doc
+         count(*) docs, -sum(n.total * (n.sum + n.sum_service) / nullif(n.sum + n.sum_service + n.vat, 0)) wat, 0::numeric svc, 0::numeric disc, null::numeric units, null::numeric free_units, -sum(n.total - n.total * (n.sum + n.sum_service) / nullif(n.sum + n.sum_service + n.vat, 0)) vat_doc
   from vw_dash_credit_notes n left join cw on cw.id = n.customer_water_id
-  where coalesce(n.status, '') <> 'cancelled' and n.issue_date between $1::date and $2::date
+  where coalesce(n.status, '') <> 'cancelled' and not exists (select 1 from record_invoices zi where zi.id = n.record_invoice_id and n.total >= zi.total - 0.01) and n.issue_date between $1::date and $2::date
   group by 1, 2, 3),
 u as (select * from w union all select * from l union all select * from f union all select * from c)
 select json_build_object('ds', 'sales_cube',

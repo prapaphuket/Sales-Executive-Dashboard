@@ -9,7 +9,7 @@ cw as (select c.id, c.registration_number reg, c.status, c.personal_type, c.bran
 gen as (select * from cw where coalesce(ty, '?') not in ('T2.2', 'T3.1')),   -- หอถัง อบต. (T2.3) นับเป็นลูกค้าทั่วไป (11/11/69)
 first_bill as (select customer_water_id cw, min(issue_date) fb, max(issue_date) lb from record_invoices where status <> 'cancelled' group by 1),
 inv as (select distinct on (i.invoice_number, i.customer_water_id, i.issue_date, i.total, i.water_unit) i.*
-        from record_invoices i, w where i.status <> 'cancelled' and i.issue_date between w.ys0 and w.e1
+        from record_invoices i, w where i.status <> 'cancelled' and not exists (select 1 from vw_dash_credit_notes zr where zr.record_invoice_id = i.id and coalesce(zr.status, '') <> 'cancelled' and zr.total >= i.total - 0.01) and i.issue_date between w.ys0 and w.e1
         order by i.invoice_number, i.customer_water_id, i.issue_date, i.total, i.water_unit, i.id),
 q as (select g.id, g.reg, g.branch_id, g.ty, g.status, g.personal_type,
              coalesce(sum(i.water_unit) filter (where i.issue_date between w.s1 and w.e1), 0) q1,

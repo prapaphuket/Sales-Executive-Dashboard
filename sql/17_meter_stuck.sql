@@ -31,8 +31,8 @@ nm as materialized (select w.id cw, coalesce(i.customer_name, nullif(trim(w.name
        left join (select distinct on (customer_water_id) customer_water_id, customer_name from record_invoices
                   where status <> 'cancelled' and customer_water_id in (select cw from sel) order by customer_water_id, issue_date desc, id desc) i on i.customer_water_id = w.id
        where w.id in (select cw from sel)),
-price as (select customer_water_id cw, sum(sum + sum_service) / nullif(sum(water_unit), 0) p from record_invoices
-          where status <> 'cancelled' and water_unit > 0 and issue_date > $2::date - interval '12 months' and customer_water_id in (select cw from sel) group by 1)
+price as (select customer_water_id cw, sum(sum + sum_service) / nullif(sum(water_unit), 0) p from record_invoices ri
+          where status <> 'cancelled' and not exists (select 1 from vw_dash_credit_notes zr where zr.record_invoice_id = ri.id and coalesce(zr.status, '') <> 'cancelled' and zr.total >= ri.total - 0.01) and water_unit > 0 and issue_date > $2::date - interval '12 months' and customer_water_id in (select cw from sel) group by 1)
 select json_build_object('ds', 'meter_stuck',
   'round', (select to_char(rnd, 'YYYY-MM-DD') from cur),
   'first_round', (select to_char(min(rnd), 'YYYY-MM-DD') from rec),

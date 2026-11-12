@@ -5,7 +5,7 @@ p as (select date_trunc('month', $2::date)::date - interval '12 months' a1, date
              date_trunc('month', $2::date)::date - interval '24 months' b1, date_trunc('month', $2::date)::date - interval '12 months' - interval '1 day' b2),
 inv as (
   select distinct on (i.invoice_number, i.customer_water_id, i.issue_date, i.total, i.water_unit) i.*
-  from record_invoices i, p where i.status <> 'cancelled' and i.issue_date between p.b1 and p.a2
+  from record_invoices i, p where i.status <> 'cancelled' and not exists (select 1 from vw_dash_credit_notes zr where zr.record_invoice_id = i.id and coalesce(zr.status, '') <> 'cancelled' and zr.total >= i.total - 0.01) and i.issue_date between p.b1 and p.a2
   order by i.invoice_number, i.customer_water_id, i.issue_date, i.total, i.water_unit, i.id),
 s as (
   select i.customer_water_id cw, i.issue_date d, i.sum + i.sum_service - case when coalesce(i.discount, 0) = 0 or coalesce(i.total_before_discount, 0) = 0 then 0
@@ -14,8 +14,8 @@ s as (
   select f.customer_water_id, f.bill_date, f.subtotal::numeric, null, null from vw_dash_bill_invoice_fees f, p
   where f.status = 'active' and f.customer_water_id in (select cw from big) and f.invoice_number not like 'BL%' and f.bill_date between p.b1 and p.a2
   union all
-  select n.customer_water_id, n.issue_date, -(n.total - n.vat), null, null from vw_dash_credit_notes n, p
-  where coalesce(n.status, '') <> 'cancelled' and n.issue_date between p.b1 and p.a2),
+  select n.customer_water_id, n.issue_date, -(n.total * (n.sum + n.sum_service) / nullif(n.sum + n.sum_service + n.vat, 0)), null, null from vw_dash_credit_notes n, p
+  where coalesce(n.status, '') <> 'cancelled' and not exists (select 1 from record_invoices zi where zi.id = n.record_invoice_id and n.total >= zi.total - 0.01) and n.issue_date between p.b1 and p.a2),
 -- ชื่อ: ใบแจ้งหนี้ล่าสุด → ถ้ายังไม่เคยมีบิลใช้ชื่อในทะเบียน customer_waters.name (อ่านเฉพาะ id, name)
 nm as (select w.id cw, coalesce(i.customer_name, nullif(trim(w.name), '')) customer_name from customer_waters w
        left join (select distinct on (customer_water_id) customer_water_id, customer_name from record_invoices where status <> 'cancelled' order by customer_water_id, issue_date desc, id desc) i on i.customer_water_id = w.id),

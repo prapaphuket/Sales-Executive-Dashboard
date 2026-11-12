@@ -26,7 +26,7 @@ cw as (
   left join meter_reading_areas ar on ar.id = wt.meter_reading_area_id
   left join lateral (select x.nm, substring(x.a from '(?:หมู่ที่|หมู่|ม\.)\s*(\d{1,2})') moo, substring(x.a from '(?:ตำบล|ต\.)\s*([ก-๙]+)') tb from addr x where x.cw = c.id) m on true),
 inv as (select distinct on (i.invoice_number, i.customer_water_id, i.issue_date, i.total, i.water_unit) i.*
-        from record_invoices i, p where i.status <> 'cancelled' and i.issue_date between p.a0 and p.e1 and i.customer_water_id is not null
+        from record_invoices i, p where i.status <> 'cancelled' and not exists (select 1 from vw_dash_credit_notes zr where zr.record_invoice_id = i.id and coalesce(zr.status, '') <> 'cancelled' and zr.total >= i.total - 0.01) and i.issue_date between p.a0 and p.e1 and i.customer_water_id is not null
         order by i.invoice_number, i.customer_water_id, i.issue_date, i.total, i.water_unit, i.id),
 u as (
   select i.customer_water_id cwid, i.branch_id, null::text tyo, to_char(i.issue_date, 'YYYY-MM') m, i.water_unit q, false l from inv i
