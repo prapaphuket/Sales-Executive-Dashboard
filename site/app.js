@@ -94,6 +94,7 @@
     S.cust = rowsOf(d.customers);
     S.custStatus = d.customers.status.map(([br, ty, status, n]) => ({ br, ty, status, n }));
     S.custCreated = d.customers.created.map(([m, n]) => ({ m, n }));
+    S.newRev = d.customers.newrev ? d.customers.newrev.map((r) => Object.fromEntries(d.customers.newrev_cols.map((c, i) => [c, r[i]]))) : [];
     S.coll = rowsOf(d.collections).map((r) => ({ ...r, k: r.kind === 'water_legacy' ? 'water' : r.kind }));
     S.cohort = rowsOf(d.cohort);
     S.ar = rowsOf(d.ar);
@@ -113,7 +114,7 @@
     // 1) นาเตย = ชื่อสาขาไม้ขาวในระบบเดิม -> รวมเป็นไม้ขาว
     const BRMAP = { 'นาเตย': 'ไม้ขาว' };
     const nb = (arr) => arr.forEach((r) => { if (BRMAP[r.br]) r.br = BRMAP[r.br]; });
-    [S.sales, S.mooM, S.cust, S.custStatus, S.coll, S.cohort, S.ar, S.top, S.decl, S.debt, S.rev, S.revCust, S.cm].forEach(nb);
+    [S.sales, S.mooM, S.cust, S.newRev, S.custStatus, S.coll, S.cohort, S.ar, S.top, S.decl, S.debt, S.rev, S.revCust, S.cm].forEach(nb);
     if (d.usage_compare) { d.usage_compare.status.forEach((r) => { if (BRMAP[r[0]]) r[0] = BRMAP[r[0]]; }); d.usage_compare.monthly.forEach((r) => { if (BRMAP[r[1]]) r[1] = BRMAP[r[1]]; }); }
     // 2) หน่วยน้ำ (และบิลที่ขาด) ของลูกค้ารายใหญ่ระบบเดิม จากไฟล์ตรวจเทียบ Pay2Head — ใช้ชั่วคราวจนกว่าจะนำเข้า WMS
     S.leg = d.legacy_units ? rowsOf(d.legacy_units) : [];
@@ -925,6 +926,12 @@
     const newTy = {}; nr.filter((r) => !NEWX.includes(r.ty)).forEach((r) => { newTy[r.ty] = (newTy[r.ty] || 0) + r.new; });
     const newTop = Object.entries(newTy).filter(([, n]) => n).sort((a, b) => b[1] - a[1]);
     const newBr = (b) => sum(nr.filter((r) => r.br === b && !NEWX.includes(r.ty)), (r) => r.new);
+    // ยอดขายของลูกค้าใหม่: ใบแจ้งหนี้ค่าน้ำของรายที่ใบแรกอยู่ในช่วง นับเฉพาะยอดที่เกิดในช่วงเดียวกัน (ไม่รวม VAT) · fee = งานขาย (ค่าติดตั้ง ฯลฯ)
+    const nrv = S.newRev.filter((r) => inR(r.fm, from, to) && inR(r.m, from, to) && okBr(r.br) && okTy(r.ty) && !NEWX.includes(r.ty));
+    const nrNet = sum(nrv, (r) => r.net), nrFee = sum(nrv, (r) => r.fee), nrUnits = sum(nrv, (r) => r.units);
+    const nrLast = sum(nrv.filter((r) => r.m === to), (r) => r.net), nrLastN = sum(nrv.filter((r) => r.m === to), (r) => r.n);
+    const nrTy = {}; nrv.forEach((r) => { const x = nrTy[r.ty] || (nrTy[r.ty] = { net: 0, fee: 0 }); x.net += r.net; x.fee += r.fee; });
+    const watAll = sum(S.sales.filter((r) => (r.src === 'W' || r.src === 'L') && inR(r.m, from, to) && okBr(r.br) && okTy(r.ty)), (r) => r.net);
     const st = S.custStatus.filter((r) => okBr(r.br) && okTy(r.ty));
     const stBy = (s) => sum(st.filter((r) => r.status === s), (r) => r.n);
     const tc = S.d.top_customers;
@@ -934,6 +941,8 @@
         ${kpi('ลูกค้าที่ออกใบแจ้งหนี้ค่าน้ำ', int(act), 'ราย', `จำนวนผู้ใช้น้ำที่มีใบแจ้งหนี้ค่าน้ำในเดือน ${mLabel(to)} (ไม่รวมลูกค้ารายใหญ่ที่ออกบิลในระบบงานขายก่อน มี.ค. 69)`, [S.f.to === S.partialMonth ? ['YoY', 'เดือนไม่ครบ', 'v-mute'] : !actY ? ['YoY', 'ไม่มีข้อมูลปีก่อน', 'v-mute'] : cmpRow('YoY', act, actY), ['เดือน', mLabel(to), 'v-mute']], 'accent')}
         ${kpi('ลูกค้าใหม่', int(newc), 'ราย', `ผู้ใช้น้ำที่ใบแจ้งหนี้ค่าน้ำใบแรกออกในช่วง ${mLabel(from)} – ${mLabel(to)} · ไม้ขาว ${int(newBr('ไม้ขาว'))} · สาคู ${int(newBr('สาคู'))}${newMv ? ` · ไม่นับ ${int(newMv)} ทะเบียนลูกค้าสัญญา (กปภ./หอถัง อบต./ทอท.) ที่แค่ย้ายเข้าระบบใหม่` : ''}`,
           newTop.slice(0, 3).map(([t, n]) => [esc(TY_NAME[t] || t), `${int(n)} ราย (${pct(newc ? n / newc : 0)})`, 'v-mute']))}
+        ${kpi('ยอดขายจากลูกค้าใหม่', mb(nrNet + nrFee), 'ล้านบาท', `ไม่รวม VAT · ลูกค้าใหม่ ${int(newc)} ราย (ใบแจ้งหนี้ค่าน้ำใบแรกใน ${mLabel(from)} – ${mLabel(to)}) นับยอดที่เกิดในช่วงเดียวกัน · ค่าน้ำ ${baht(nrNet)} บาท (${int(nrUnits)} ลบ.ม.) + งานขาย เช่นค่าติดตั้ง ${baht(nrFee)} บาท · ไม่รวมทะเบียนลูกค้าสัญญาที่ย้ายเข้าระบบใหม่`,
+          [['ค่าน้ำ', `${mb(nrNet)} ล้าน (${pct(watAll ? nrNet / watAll : 0)} ของค่าน้ำรวม)`, 'v-mute'], ['งานขาย/ค่าติดตั้ง', mb(nrFee) + ' ล้าน', 'v-mute'], [`ค่าน้ำ ${mLabel(to)}`, `${int(nrLast)} บาท (${int(nrLastN)} ราย)`, 'v-mute']])}
         ${kpi('ทะเบียนผู้ใช้น้ำปัจจุบัน', int(sum(st, (r) => r.n)), 'ราย', `ใช้งาน ${int(stBy('active'))} · งดจ่ายน้ำ ${int(stBy('disconnected'))} · ยกเลิก ${int(stBy('closed'))} · รอติดตั้ง ${int(stBy('pending_install'))}`, [['ใช้งาน', int(stBy('active')) + ' ราย', 'v-mute'], ['ยกเลิก', int(stBy('closed')) + ' ราย', 'v-mute']])}
         ${kpi('การกระจุกตัวของรายได้', pct(tc.top10_net / tc.total_net), '', `ลูกค้า 10 รายแรก จาก ${int(tc.n_cust)} รายที่มียอด (ยอดค่าน้ำ 12 เดือนล่าสุด ทุกสาขา ไม่รวมงานขาย ไม่ขึ้นกับตัวกรอง)`, [['ของรายได้', '10 รายแรก', 'v-mute'], ['20 รายแรก', pct(tc.top20_net / tc.total_net), 'v-mute']])}
       </div>
@@ -998,9 +1007,10 @@
     $('t-st').innerHTML = `<div class="legend-row">${SC.map(([, c, l]) => `<span><i style="background:${c}"></i>${l}</span>`).join('')}</div>` + table([
       { h: 'ประเภท', nw: 1, f: (r) => esc(TY_NAME[r.t] || r.t) }, { h: 'สัดส่วนสถานะ', cls: 'sbar-cell', f: sbar, v: () => '' }, { h: 'ใช้งาน', n: 1, f: (r) => int(r.a) },
       { h: `ลูกค้าใหม่<br><span class="muted small">${mLabel(from)}–${mLabel(to)}</span>`, n: 1, cls: 'newc', f: (r) => (NEWX.includes(r.t) ? `<span class="muted" title="ใบแรกในระบบใหม่ = ย้ายเข้าระบบ ไม่ใช่ลูกค้าใหม่">–</span>` : newTy[r.t] ? `<b>+${int(newTy[r.t])}</b>` : '<span class="muted">0</span>'), v: (r) => (NEWX.includes(r.t) ? '' : newTy[r.t] || 0) },
+      { h: `ยอดขาย (บาท)<br><span class="muted small">ลูกค้าใหม่</span>`, n: 1, f: (r) => (NEWX.includes(r.t) ? '<span class="muted">–</span>' : nrTy[r.t] ? int(nrTy[r.t].net + nrTy[r.t].fee) : '<span class="muted">0</span>'), v: (r) => (NEWX.includes(r.t) || !nrTy[r.t] ? '' : (nrTy[r.t].net + nrTy[r.t].fee).toFixed(2)) },
       { h: 'งดจ่ายน้ำ', n: 1, f: (r) => int(r.d) },
       { h: 'ยกเลิก', n: 1, f: (r) => (r.all && r.c / r.all > 0.3 ? `<b class="v-bad">${int(r.c)}</b>` : int(r.c)) }, { h: 'รอติดตั้ง', n: 1, f: (r) => int(r.p) }, { h: 'รวม', n: 1, f: (r) => `<b>${int(r.all)}</b>` },
-    ], strows, ['รวม', '', int(sum(strows, (r) => r.a)), `<b>+${int(newc)}</b>`, int(sum(strows, (r) => r.d)), int(sum(strows, (r) => r.c)), int(sum(strows, (r) => r.p)), int(sum(strows, (r) => r.all))]);
+    ], strows, ['รวม', '', int(sum(strows, (r) => r.a)), `<b>+${int(newc)}</b>`, `<b>${int(nrNet + nrFee)}</b>`, int(sum(strows, (r) => r.d)), int(sum(strows, (r) => r.c)), int(sum(strows, (r) => r.p)), int(sum(strows, (r) => r.all))]);
     $('st-foot').innerHTML = hiC.map((r) => `${esc(TY_NAME[r.t] || r.t)} ยกเลิกแล้ว <b class="v-bad">${int(r.c)}</b> จาก ${int(r.all)} ราย (${pct(r.c / r.all)}) — สูงกว่าเกณฑ์ 30% ควรตรวจว่าเป็นการย้ายออกจริงหรือทะเบียนค้างในระบบ`).join('<br>');
   }
   // หมายเหตุลูกค้ารายใหญ่ที่ตัวเลขเปลี่ยนเพราะข้อมูล ไม่ใช่พฤติกรรมการใช้น้ำ (อ้างอิง customer_water_id)
@@ -1813,6 +1823,7 @@
     ['อัตราเก็บเงินรายรุ่น', 'ยอดใบแจ้งหนี้ค่าน้ำรุ่นเดือน X ที่ชำระแล้ว (ใบเสร็จถึงวันอ้างอิง) ÷ ยอดแจ้งหนี้รุ่นเดียวกัน · ตรงเวลา = ชำระภายในวันครบกำหนด · เฉพาะระบบใหม่ (มี.ค. 69 เป็นต้นไป)', 'เดือนออกใบแจ้งหนี้ + วันอ้างอิง'],
     ['ลูกหนี้คงค้าง / อายุหนี้', 'ใบแจ้งหนี้ค่าน้ำสถานะค้างชำระ ออก ≤ วันอ้างอิง แบ่งช่วง ยังไม่ครบกำหนด / 1–30 / 31–60 / 61–90 / > 90 วันหลังวันครบกำหนด (ไม่ซ้อนกัน รวมกันเท่ายอดคงค้าง) + ใบแจ้งหนี้งานขายค้างชำระ (ไม่มีวันครบกำหนด)', 'วันอ้างอิง'],
     ['ลูกค้าที่ออกใบแจ้งหนี้', 'จำนวนผู้ใช้น้ำที่มีใบแจ้งหนี้ค่าน้ำ (ไม่ยกเลิก) ในเดือน · ลูกค้าใหม่ = ใบแรกในประวัติอยู่ในเดือนนั้น', 'วันที่ออกใบแจ้งหนี้'],
+    ['ยอดขายจากลูกค้าใหม่', 'ค่าน้ำ + ค่าบริการ − ส่วนลด (ไม่รวม VAT) ของลูกค้าที่ใบแจ้งหนี้ค่าน้ำใบแรกอยู่ในช่วงที่เลือก นับเฉพาะยอดที่เกิดในช่วงเดียวกัน + งานขาย (เช่นค่าติดตั้ง) ของลูกค้ากลุ่มเดียวกัน · ไม่รวมทะเบียนลูกค้าสัญญาที่ย้ายเข้าระบบใหม่', 'วันที่ออกใบแจ้งหนี้'],
     ['MoM / YoY / YTD', 'เทียบช่วงยาวเท่ากันก่อนหน้า / ช่วงเดียวกันปีก่อน / ม.ค.–เดือนที่เลือก เทียบปีก่อน · ไม่แสดงเมื่อไม่มีข้อมูลฐานหรือเดือนไม่ครบ · ⚠ เมื่อช่วงที่เทียบมีเดือนที่ไม่มีรายได้ กปภ. (หน้าแล้ง/สัญญาสิ้นสุด)', 'วันที่ออกเอกสาร'],
     ['เป้ายอดขาย', 'ไม่มีข้อมูลเป้าในระบบ แสดง “ยังไม่กำหนดเป้า”', '–'],
   ];
