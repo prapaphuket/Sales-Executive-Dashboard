@@ -566,6 +566,9 @@ table.vlines tr.grp td { border-left: 0; }
 .note-box.info { background: var(--muted-bg); display: block; margin-top: 8px; }
 .t td.sbar-cell { min-width: 160px; }
 .t td.sbar-cell .sbar { height: 12px; }
+/* ตารางสถานะทะเบียน (หน้าลูกค้า): คอลัมน์เยอะ — บีบแถบสัดส่วนและระยะห่างให้พอดีการ์ด */
+#t-st .t th, #t-st .t td { padding-left: 8px; padding-right: 8px; }
+#t-st .t td.sbar-cell { min-width: 64px; width: 16%; }
 .agebar { display: grid; grid-template-columns: minmax(80px, 1fr) 40px; gap: 8px; align-items: center; }
 .agebar .track { position: relative; height: 10px; background: var(--row-sub); border-radius: 3px; }
 .agebar .track i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--ch-br1); border-radius: 3px; }
