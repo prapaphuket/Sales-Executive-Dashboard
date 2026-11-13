@@ -1,6 +1,9 @@
 -- 03_customers : ลูกค้าที่มีบิลค่าน้ำในเดือน, ลูกค้าเริ่มมีบิลครั้งแรก (ลูกค้าใหม่ตามการเรียกเก็บ), สถานะทะเบียนปัจจุบัน
 with cw as (select c.id, c.branch_id, c.status, split_part(t.name, ' - ', 1) ty from vw_dash_customer_waters c left join customer_water_types t on t.id = c.type_id),
-firstbill as (select customer_water_id, min(issue_date) d1 from record_invoices where status <> 'cancelled' group by 1),
+-- ใบแรก = ใบแจ้งหนี้ค่าน้ำใบแรก · ไม่นับทะเบียนที่ไม่เคยมีหน่วยน้ำเลยและไม่ได้อยู่ในสถานะใช้งาน
+-- (เช่นทะเบียนเก่าที่ออกบิลหน่วย 0 ครั้งเดียวแล้วงดจ่ายน้ำ) · ลูกค้าที่ติดตั้งแล้วแต่ยังไม่ใช้น้ำ (บิลหน่วย 0 + ใช้งาน) ยังนับเป็นลูกค้าใหม่
+firstbill as (select i.customer_water_id, min(i.issue_date) d1 from record_invoices i join customer_waters c on c.id = i.customer_water_id
+  where i.status <> 'cancelled' group by 1 having max(i.water_unit) > 0 or max(c.status) = 'active'),
 act as (
   select to_char(i.issue_date, 'YYYY-MM') m, i.branch_id, coalesce(cw.ty, '?') ty,
          count(distinct i.customer_water_id) active,

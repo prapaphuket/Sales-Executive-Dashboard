@@ -50,7 +50,7 @@ rep('<div class="app">', `<div class="lock" id="lock">
     <div class="logo-zone"><img class="logo" src="assets/hea-logo-white@2x.png" width="132" height="76" alt="HYDRO ENTERPRISE AND AQUA DESIGN — บริษัท ไฮโดรเอ็นเตอร์ไพร์ส แอนด์ อะควอดีซายน์ จำกัด"></div>
     <form onsubmit="return false">
       <h1>HEA Sales Executive Dashboard</h1>
-      <p>ภาพรวมยอดขายและการจัดเก็บธุรกิจน้ำประปา · รายงานภายใน บริษัท ไฮโดรเอ็นเตอร์ไพร์ส แอนด์ อะควอดีซายน์ จำกัด</p>
+      <p>ภาพรวมรายได้และการจัดเก็บธุรกิจน้ำประปา · รายงานภายใน บริษัท ไฮโดรเอ็นเตอร์ไพร์ส แอนด์ อะควอดีซายน์ จำกัด</p>
       <p>เข้าสู่ระบบด้วยบัญชี Microsoft 365 ของบริษัท</p>
       <button class="btn" id="go" type="button" disabled>กำลังตรวจสอบ…</button>
       <button class="btn ghost" id="out" type="button" hidden>ออกจากระบบ / ลองบัญชีอื่น</button>
