@@ -11,7 +11,7 @@ s as (
          else i.discount * (i.sum + i.sum_service) / i.total_before_discount end net from inv i
   union all
   select f.customer_water_id, 'L', f.invoice_number, f.bill_date, case when f.bill_fee_id is null then 'pending' else 'paymented' end, null, f.subtotal::numeric
-  from vw_dash_bill_invoice_fees f, p where f.status = 'active' and f.customer_water_id in (select cw from big) and f.invoice_number not like 'BL%' and f.bill_date between p.a1 and p.a2
+  from vw_dash_bill_invoice_fees f, p where f.status = 'active' and f.customer_water_id in (select cw from big) and f.invoice_number not like 'BL%' and f.bill_date between p.a1 and p.a2 and not exists (select 1 from record_invoices zd where zd.invoice_number = f.invoice_number and zd.customer_water_id = f.customer_water_id and zd.status <> 'cancelled')
   union all
   select n.customer_water_id, 'C', n.credit_note_number, n.issue_date, n.status, null, -(n.total * (n.sum + n.sum_service) / nullif(n.sum + n.sum_service + n.vat, 0)) from vw_dash_credit_notes n, p
   where coalesce(n.status, '') <> 'cancelled' and not exists (select 1 from record_invoices zi where zi.id = n.record_invoice_id and n.total >= zi.total - 0.01) and n.issue_date between p.a1 and p.a2),

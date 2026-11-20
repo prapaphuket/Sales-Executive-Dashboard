@@ -23,7 +23,7 @@ st as materialized (
          max(rnd) filter (where u > 0) last_use
   from r group by cw having max(gap) filter (where rn = 1) = 0),
 cw as (select c.id, c.registration_number reg, c.status, c.branch_id, c.meter_reading_area_id area, split_part(t.name, ' - ', 1) ty
-       from vw_dash_customer_waters c left join customer_water_types t on t.id = c.type_id),
+       from vw_dash_customer_waters c left join customer_water_types t on t.id = case when c.id = 1363 then 11 else c.type_id end),
 sel as materialized (select st.cw, st.streak, st.n_rounds, st.last_use, max(r.cu) filter (where r.rn = 1) cu,
                round(avg(r.u) filter (where r.rn > st.streak and r.rn <= st.streak + 6 and r.u > 0), 1) avg_before
         from st join r on r.cw = st.cw where st.streak >= 3 group by st.cw, st.streak, st.n_rounds, st.last_use),

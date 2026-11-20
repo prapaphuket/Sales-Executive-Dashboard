@@ -17,7 +17,7 @@ cw as (
               when ar.title ~ 'หมากปรก' then 'หมู่ 1' when ar.title ~ 'คอเอน' then 'หมู่ 2' when ar.title ~ 'สวนมะพร้าว' then 'หมู่ 3'
               when ar.title ~ 'บ้านไม้ขาว' then 'หมู่ 4' when ar.title ~ 'ท่าฉัตรไชย' then 'หมู่ 5' when ar.title ~ 'บ่อไทร' then 'หมู่ 6' when ar.title ~ 'บ้านหยิด' then 'หมู่ 7'
               else 'ไม่ระบุหมู่' end moo
-  from vw_dash_customer_waters c left join customer_water_types t on t.id = c.type_id
+  from vw_dash_customer_waters c left join customer_water_types t on t.id = case when c.id = 1363 then 11 else c.type_id end
   left join customer_waters wt on wt.id = c.id
   left join meter_reading_areas ar on ar.id = wt.meter_reading_area_id
   left join lateral (select substring(x.a from '(?:หมู่ที่|หมู่|ม\.)\s*(\d{1,2})') moo, substring(x.a from '(?:ตำบล|ต\.)\s*([ก-๙]+)') tb from addr x where x.cw = c.id) m on true),

@@ -1,6 +1,6 @@
 -- 09_debtors : ลูกหนี้เกินกำหนดรายใหญ่ 25 ราย ณ วันอ้างอิง + รายการใบแจ้งหนี้ค้าง (drill-down)
-with cw as (select c.id, c.registration_number, c.personal_type, c.status, c.branch_id, split_part(t.name, ' - ', 1) ty from vw_dash_customer_waters c left join customer_water_types t on t.id = c.type_id),
-pend as (select * from record_invoices where status = 'pending' and issue_date <= $2::date),
+with cw as (select c.id, c.registration_number, c.personal_type, c.status, c.branch_id, split_part(t.name, ' - ', 1) ty from vw_dash_customer_waters c left join customer_water_types t on t.id = case when c.id = 1363 then 11 else c.type_id end),
+pend as (select * from record_invoices where status = 'pending' and issue_date <= $2::date and not exists (select 1 from bill_invoice_fees zf join bill_fees zb on zb.id = zf.bill_fee_id where zf.invoice_number = record_invoices.invoice_number and zf.customer_water_id = record_invoices.customer_water_id and zf.status = 'active' and zb.status = 'active')),
 agg as (select customer_water_id cw, count(*) n, sum(total) ar, sum(total) filter (where due_date < $2::date) overdue, min(due_date) oldest,
                sum(total) filter (where $2::date - due_date between 1 and 30) b1, sum(total) filter (where $2::date - due_date between 31 and 60) b2,
                sum(total) filter (where $2::date - due_date between 61 and 90) b3, sum(total) filter (where $2::date - due_date > 90) b4

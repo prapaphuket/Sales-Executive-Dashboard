@@ -12,7 +12,7 @@ s as (
          else i.discount * (i.sum + i.sum_service) / i.total_before_discount end net, i.water_unit units, i.customer_name nm from inv i
   union all
   select f.customer_water_id, f.bill_date, f.subtotal::numeric, null, null from vw_dash_bill_invoice_fees f, p
-  where f.status = 'active' and f.customer_water_id in (select cw from big) and f.invoice_number not like 'BL%' and f.bill_date between p.b1 and p.a2
+  where f.status = 'active' and f.customer_water_id in (select cw from big) and f.invoice_number not like 'BL%' and f.bill_date between p.b1 and p.a2 and not exists (select 1 from record_invoices zd where zd.invoice_number = f.invoice_number and zd.customer_water_id = f.customer_water_id and zd.status <> 'cancelled')
   union all
   select n.customer_water_id, n.issue_date, -(n.total * (n.sum + n.sum_service) / nullif(n.sum + n.sum_service + n.vat, 0)), null, null from vw_dash_credit_notes n, p
   where coalesce(n.status, '') <> 'cancelled' and not exists (select 1 from record_invoices zi where zi.id = n.record_invoice_id and n.total >= zi.total - 0.01) and n.issue_date between p.b1 and p.a2),
@@ -22,7 +22,7 @@ nm as (select w.id cw, coalesce(i.customer_name, nullif(trim(w.name), '')) custo
 agg as (
   select s.cw, sum(net) filter (where d >= p.a1) net, sum(net) filter (where d < p.a1) prev, sum(units) filter (where d >= p.a1) units
   from s, p group by s.cw),
-ar as (select customer_water_id cw, sum(total) ar, sum(total) filter (where due_date < $2::date) overdue from record_invoices where status = 'pending' and issue_date <= $2::date group by 1),
+ar as (select customer_water_id cw, sum(total) ar, sum(total) filter (where due_date < $2::date) overdue from record_invoices where status = 'pending' and issue_date <= $2::date and not exists (select 1 from bill_invoice_fees zf join bill_fees zb on zb.id = zf.bill_fee_id where zf.invoice_number = record_invoices.invoice_number and zf.customer_water_id = record_invoices.customer_water_id and zf.status = 'active' and zb.status = 'active') group by 1),
 tot as (select sum(net) total_net, count(*) filter (where net > 0) n_cust from agg),
 ranked as (select agg.*, row_number() over (order by net desc nulls last) rk from agg)
 select json_build_object('ds', 'top_customers',
@@ -34,5 +34,5 @@ select json_build_object('ds', 'top_customers',
             coalesce(nm.customer_name, '–'),
             coalesce(b.name, 'ไม่ระบุ'), coalesce(split_part(t.name, ' - ', 1), '?'), round(r.net, 2), round(r.prev, 2), round(r.units, 0),
             round(coalesce(ar.ar, 0), 2), round(coalesce(ar.overdue, 0), 2), c.status) order by r.rk)
-           from ranked r left join vw_dash_customer_waters c on c.id = r.cw left join customer_water_types t on t.id = c.type_id
+           from ranked r left join vw_dash_customer_waters c on c.id = r.cw left join customer_water_types t on t.id = case when c.id = 1363 then 11 else c.type_id end
            left join branches b on b.id = c.branch_id left join nm on nm.cw = r.cw left join ar on ar.cw = r.cw where r.rk <= 15));

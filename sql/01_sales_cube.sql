@@ -3,7 +3,7 @@
 -- $1::date = วันแรกของช่วง (date), $2::date = วันอ้างอิง/วันสุดท้ายของข้อมูล (date)
 -- src: W = ค่าน้ำ+ค่าบริการ (ใบแจ้งหนี้ค่าน้ำ) | L = ค่าน้ำลูกค้ารายใหญ่จากใบแจ้งหนี้ระบบเดิม (INT/IMK) | F = งานขายและบริการอื่น | C = ใบลดหนี้ (ติดลบ)
 with big as (select unnest(array[4, 2438, 1363]) cw),  -- กปภ. AR00C-00029, ทอท. AR00C-02663, อบต.ไม้ขาว/หอถัง (เดิม NT63020004)
-cw as (select c.id, c.branch_id, c.dma_id, split_part(t.name, ' - ', 1) ty from vw_dash_customer_waters c left join customer_water_types t on t.id = c.type_id),
+cw as (select c.id, c.branch_id, c.dma_id, split_part(t.name, ' - ', 1) ty from vw_dash_customer_waters c left join customer_water_types t on t.id = case when c.id = 1363 then 11 else c.type_id end),
 inv as (  -- ตัดแถวซ้ำที่เหมือนกันทุกค่า (เลขเอกสาร ลูกค้า วันที่ ยอด หน่วย) เหลือแถวเดียว
   select distinct on (i.invoice_number, i.customer_water_id, i.issue_date, i.total, i.water_unit) i.*
   from record_invoices i
@@ -27,6 +27,7 @@ l as (
   from vw_dash_bill_invoice_fees f
   where f.status = 'active' and f.bill_date between $1::date and $2::date
     and f.customer_water_id in (select cw from big) and f.invoice_number not like 'BL%'
+    and not exists (select 1 from record_invoices zd where zd.invoice_number = f.invoice_number and zd.customer_water_id = f.customer_water_id and zd.status <> 'cancelled')
   group by 1, 2, 3),
 f as (
   select to_char(f.bill_date, 'YYYY-MM') m, f.branch_id, coalesce(cw.ty, '?') ty, 'F' src,
@@ -34,6 +35,7 @@ f as (
   from vw_dash_bill_invoice_fees f left join cw on cw.id = f.customer_water_id
   where f.status = 'active' and f.bill_date between $1::date and $2::date
     and not (f.customer_water_id in (select cw from big) and f.invoice_number not like 'BL%')
+    and not exists (select 1 from record_invoices zd where zd.invoice_number = f.invoice_number and zd.customer_water_id = f.customer_water_id and zd.status <> 'cancelled')
   group by 1, 2, 3),
 c as (
   select to_char(n.issue_date, 'YYYY-MM') m, n.branch_id, coalesce(cw.ty, '?') ty, 'C' src,

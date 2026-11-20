@@ -1,5 +1,5 @@
 -- 03_customers : ลูกค้าที่มีบิลค่าน้ำในเดือน, ลูกค้าเริ่มมีบิลครั้งแรก (ลูกค้าใหม่ตามการเรียกเก็บ), สถานะทะเบียนปัจจุบัน
-with cw as (select c.id, c.branch_id, c.status, split_part(t.name, ' - ', 1) ty from vw_dash_customer_waters c left join customer_water_types t on t.id = c.type_id),
+with cw as (select c.id, c.branch_id, c.status, split_part(t.name, ' - ', 1) ty from vw_dash_customer_waters c left join customer_water_types t on t.id = case when c.id = 1363 then 11 else c.type_id end),
 -- ใบแรก = ใบแจ้งหนี้ค่าน้ำใบแรก · ไม่นับทะเบียนที่ไม่เคยมีหน่วยน้ำเลยและไม่ได้อยู่ในสถานะใช้งาน
 -- (เช่นทะเบียนเก่าที่ออกบิลหน่วย 0 ครั้งเดียวแล้วงดจ่ายน้ำ) · ลูกค้าที่ติดตั้งแล้วแต่ยังไม่ใช้น้ำ (บิลหน่วย 0 + ใช้งาน) ยังนับเป็นลูกค้าใหม่
 firstbill as (select i.customer_water_id, min(i.issue_date) d1 from record_invoices i join customer_waters c on c.id = i.customer_water_id
@@ -29,7 +29,7 @@ nu as (
   union all
   select to_char(fb.d1, 'YYYY-MM'), to_char(f.bill_date, 'YYYY-MM'), f.branch_id, coalesce(cw.ty, '?'), f.customer_water_id, 0, 0, f.subtotal::numeric, 'F'
   from vw_dash_bill_invoice_fees f join firstbill fb on fb.customer_water_id = f.customer_water_id left join cw on cw.id = f.customer_water_id
-  where f.status = 'active' and fb.d1 between $1::date and $2::date and f.bill_date between $1::date and $2::date),
+  where f.status = 'active' and fb.d1 between $1::date and $2::date and f.bill_date between $1::date and $2::date and not exists (select 1 from record_invoices zd where zd.invoice_number = f.invoice_number and zd.customer_water_id = f.customer_water_id and zd.status <> 'cancelled')),
 newrev as (select fm, m, branch_id, ty, count(distinct cwid) filter (where k = 'W') n, sum(net) net, sum(units) units, sum(fee) fee from nu group by 1, 2, 3, 4)
 select json_build_object('ds', 'customers',
   'cols', json_build_array('m','br','ty','active','new'),

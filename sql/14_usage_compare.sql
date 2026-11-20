@@ -5,7 +5,7 @@ with p as (select (date_trunc('month', $2::date) - interval '1 day')::date e1, $
 w as (select (date_trunc('month', e1) - interval '3 months')::date s1, e1, (date_trunc('month', e1) - interval '15 months')::date s0, (e1 - interval '1 year')::date e0,
              date_trunc('year', e1)::date ys, (date_trunc('year', e1) - interval '1 year')::date ys0 from p),
 cw as (select c.id, c.registration_number reg, c.status, c.personal_type, c.branch_id, split_part(t.name, ' - ', 1) ty
-       from vw_dash_customer_waters c left join customer_water_types t on t.id = c.type_id),
+       from vw_dash_customer_waters c left join customer_water_types t on t.id = case when c.id = 1363 then 11 else c.type_id end),
 gen as (select * from cw where coalesce(ty, '?') not in ('T2.2', 'T3.1')),   -- หอถัง อบต. (T2.3) นับเป็นลูกค้าทั่วไป (11/11/69)
 first_bill as (select customer_water_id cw, min(issue_date) fb, max(issue_date) lb from record_invoices where status <> 'cancelled' group by 1),
 inv as (select distinct on (i.invoice_number, i.customer_water_id, i.issue_date, i.total, i.water_unit) i.*

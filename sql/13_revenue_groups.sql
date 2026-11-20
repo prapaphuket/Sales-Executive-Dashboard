@@ -21,7 +21,7 @@ cw as (
               when ar.title ~ 'หมากปรก' then 'หมู่ 1' when ar.title ~ 'คอเอน' then 'หมู่ 2' when ar.title ~ 'สวนมะพร้าว' then 'หมู่ 3'
               when ar.title ~ 'บ้านไม้ขาว' then 'หมู่ 4' when ar.title ~ 'ท่าฉัตรไชย' then 'หมู่ 5' when ar.title ~ 'บ่อไทร' then 'หมู่ 6' when ar.title ~ 'บ้านหยิด' then 'หมู่ 7'
               else 'ไม่ระบุหมู่' end moo
-  from vw_dash_customer_waters c left join customer_water_types t on t.id = c.type_id
+  from vw_dash_customer_waters c left join customer_water_types t on t.id = case when c.id = 1363 then 11 else c.type_id end
   left join customer_waters wt on wt.id = c.id
   left join meter_reading_areas ar on ar.id = wt.meter_reading_area_id
   left join lateral (select substring(x.a from '(?:หมู่ที่|หมู่|ม\.)\s*(\d{1,2})') moo, substring(x.a from '(?:ตำบล|ต\.)\s*([ก-๙]+)') tb from addr x where x.cw = c.id) m on true),
@@ -38,7 +38,7 @@ u as (
   select f.bill_date, f.branch_id, f.customer_water_id, case when f.customer_water_id in (select cw from big) and f.invoice_number not like 'BL%' then 'L' else 'F' end,
          case when f.customer_water_id in (select cw from big) and f.invoice_number not like 'BL%' then f.subtotal else 0 end::numeric,
          case when f.customer_water_id in (select cw from big) and f.invoice_number not like 'BL%' then 0 else f.subtotal end::numeric, 0::numeric, null::numeric, 0::numeric
-  from vw_dash_bill_invoice_fees f, w where f.status = 'active' and (f.bill_date between w.a0 and w.e1)
+  from vw_dash_bill_invoice_fees f, w where f.status = 'active' and (f.bill_date between w.a0 and w.e1) and not exists (select 1 from record_invoices zd where zd.invoice_number = f.invoice_number and zd.customer_water_id = f.customer_water_id and zd.status <> 'cancelled')
   union all
   select n.issue_date, n.branch_id, n.customer_water_id, 'C', -(n.total * (n.sum + n.sum_service) / nullif(n.sum + n.sum_service + n.vat, 0)), 0::numeric, 0::numeric, null::numeric, 0::numeric
   from vw_dash_credit_notes n, w where coalesce(n.status, '') <> 'cancelled' and not exists (select 1 from record_invoices zi where zi.id = n.record_invoice_id and n.total >= zi.total - 0.01) and (n.issue_date between w.a0 and w.e1)),

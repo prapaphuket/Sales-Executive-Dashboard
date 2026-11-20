@@ -14,7 +14,7 @@ with rec as (
 ),
 cur as (select max(rnd) rnd from rec),
 cw as (select c.id, c.registration_number reg, c.personal_type, c.status, c.branch_id, c.meter_reading_area_id area, split_part(t.name, ' - ', 1) ty
-       from vw_dash_customer_waters c left join customer_water_types t on t.id = c.type_id),
+       from vw_dash_customer_waters c left join customer_water_types t on t.id = case when c.id = 1363 then 11 else c.type_id end),
 -- ชื่อ: ใบแจ้งหนี้ล่าสุด → ถ้ายังไม่เคยมีบิลใช้ชื่อในทะเบียน customer_waters.name (อ่านเฉพาะ id, name)
 nm as (select w.id cw, coalesce(i.customer_name, nullif(trim(w.name), '')) customer_name from customer_waters w
        left join (select distinct on (customer_water_id) customer_water_id, customer_name from record_invoices where status <> 'cancelled' order by customer_water_id, issue_date desc, id desc) i on i.customer_water_id = w.id),
@@ -61,7 +61,7 @@ select json_build_object(
                 (select to_char(max(wa.installed_at), 'YYYY-MM-DD') from water_meter_assignments wa where wa.customer_water_id = cw.id and wa.action_type = 'install'),
                 (select to_char(v.created_at, 'YYYY-MM-DD') from vw_dash_customer_waters v where v.id = cw.id),
                 (select to_char(max(z.d), 'YYYY-MM-DD') from (select i.issue_date d from record_invoices i, cur where i.customer_water_id = cw.id and i.status <> 'cancelled' and date_trunc('month', i.issue_date) = cur.rnd
-                   union all select f.bill_date from bill_invoice_fees f, cur where f.customer_water_id = cw.id and f.status = 'active' and f.invoice_number not like 'BL%' and date_trunc('month', f.bill_date) = cur.rnd) z),
+                   union all select f.bill_date from bill_invoice_fees f, cur where f.customer_water_id = cw.id and f.status = 'active' and f.invoice_number not like 'BL%' and date_trunc('month', f.bill_date) = cur.rnd and not exists (select 1 from record_invoices zd where zd.invoice_number = f.invoice_number and zd.customer_water_id = f.customer_water_id and zd.status <> 'cancelled')) z),
                 (select count(*) from record_invoices i where i.customer_water_id = cw.id and i.status = 'cancelled'),
                 (select to_char(max(i.issue_date), 'YYYY-MM-DD') from record_invoices i where i.customer_water_id = cw.id and i.status = 'cancelled')) order by cw.reg)
               from cw left join rd on rd.customer_water_id = cw.id left join nm on nm.cw = cw.id left join branches b on b.id = cw.branch_id

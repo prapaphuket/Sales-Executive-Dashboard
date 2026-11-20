@@ -37,7 +37,8 @@ const DATASETS = {
 };
 const NO_PARAMS = new Set(['meta']);
 // ข้อมูลเสริมที่ไม่ได้อยู่ในฐานข้อมูล (ไฟล์ใน data/) — ใช้ทั้งโหมดสดและ snapshot
-const FILE_DATASETS = { legacy_units: 'legacy_units.json' };
+// legacy_units.json เลิกใช้ 20/11/69 — 389 ใบนำเข้า WMS แล้ว (หน่วยน้ำอยู่ใน record_invoices) ถ้ายังใส่ไฟล์จะนับหน่วยซ้ำ
+const FILE_DATASETS = { trc_recon: 'trc_recon.json' };
 
 let pool = null;
 if (!SNAPSHOT) {

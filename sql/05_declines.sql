@@ -12,7 +12,7 @@ s as (
          else i.discount * (i.sum + i.sum_service) / i.total_before_discount end net, i.water_unit units from inv i
   union all
   select f.customer_water_id, f.bill_date, f.subtotal::numeric, null from vw_dash_bill_invoice_fees f, p
-  where f.status = 'active' and f.customer_water_id in (select cw from big) and f.invoice_number not like 'BL%'
+  where f.status = 'active' and f.customer_water_id in (select cw from big) and f.invoice_number not like 'BL%' and not exists (select 1 from record_invoices zd where zd.invoice_number = f.invoice_number and zd.customer_water_id = f.customer_water_id and zd.status <> 'cancelled')
     and (f.bill_date between p.a1 and p.a2 or f.bill_date between p.b1 and p.b2)
   union all
   select n.customer_water_id, n.issue_date, -(n.total * (n.sum + n.sum_service) / nullif(n.sum + n.sum_service + n.vat, 0)), null from vw_dash_credit_notes n, p
@@ -31,5 +31,5 @@ select json_build_object('ds', 'declines',
             coalesce(nm.customer_name, '–'),
             coalesce(b.name, 'ไม่ระบุ'), coalesce(split_part(t.name, ' - ', 1), '?'), round(s.cur, 2), round(s.prev, 2), round(s.ucur, 0), round(s.uprev, 0), c.status)
             order by s.prev - s.cur desc)
-           from sel s left join vw_dash_customer_waters c on c.id = s.cw left join customer_water_types t on t.id = c.type_id
+           from sel s left join vw_dash_customer_waters c on c.id = s.cw left join customer_water_types t on t.id = case when c.id = 1363 then 11 else c.type_id end
            left join branches b on b.id = c.branch_id left join nm on nm.cw = s.cw));

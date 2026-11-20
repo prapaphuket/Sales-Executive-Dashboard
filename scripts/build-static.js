@@ -22,11 +22,13 @@ if (![16, 24, 32].includes(key.length)) { console.error('ไฟล์กุญ�
 
 // รวมข้อมูล
 const snap = JSON.parse(fs.readFileSync(path.join(dataDir, '_snapshot.json'), 'utf8'));
-const names = fs.readdirSync(path.join(ROOT, 'sql')).filter((f) => /^\d\d_.*\.sql$/.test(f)).sort().map((f) => f.replace(/^\d\d_/, '').replace(/\.sql$/, ''));
+const names = fs.readdirSync(path.join(ROOT, 'sql')).filter((f) => /^\d\d_.*\.sql$/.test(f)).sort().map((f) => f.replace(/^\d\d_/, '').replace(/\.sql$/, ''))
+  .filter((n) => n !== 'trc_docs');  // trc_docs = รายการเอกสารดิบสำหรับกระทบยอด ใช้ใน scripts/trc_recon.py เท่านั้น ไม่ใส่ในเว็บ
 const ds = {};
 for (const n of names) ds[n] = JSON.parse(fs.readFileSync(path.join(dataDir, n + '.json'), 'utf8'));
 // ข้อมูลเสริมจากไฟล์ (ไม่ได้มาจาก SQL)
-for (const n of ['legacy_units']) if (fs.existsSync(path.join(dataDir, n + '.json'))) { ds[n] = JSON.parse(fs.readFileSync(path.join(dataDir, n + '.json'), 'utf8')); names.push(n); }
+// trc_recon = ผลกระทบยอด WMS ↔ TRCloud (scripts/trc_recon.py) · legacy_units เลิกใช้ 20/11/69
+for (const n of ['trc_recon']) if  (fs.existsSync(path.join(dataDir, n + '.json'))) { ds[n] = JSON.parse(fs.readFileSync(path.join(dataDir, n + '.json'), 'utf8')); names.push(n); }
 const bundle = { config: { mode: 'snapshot', asof_default: snap.asof, snapshot: snap, history_months: 24, datasets: names }, ds };
 
 const iv = crypto.randomBytes(12);

@@ -7,6 +7,7 @@ const { Pool } = require('pg');
 
 const ROOT = path.join(__dirname, '..');
 const asof = process.argv[2] || new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
+if (!/^\d{4}-\d{2}-\d{2}$/.test(asof)) { console.error('วันที่ต้องเป็นรูปแบบ YYYY-MM-DD'); process.exit(1); }
 const months = Number(process.env.HISTORY_MONTHS || 24);
 const d = new Date(asof + 'T00:00:00Z');
 const start = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - months, 1)).toISOString().slice(0, 10);
@@ -23,7 +24,8 @@ const pool = new Pool({
   for (const f of files) {
     const name = f.replace(/^\d\d_/, '').replace(/\.sql$/, '');
     const sql = fs.readFileSync(path.join(ROOT, 'sql', f), 'utf8');
-    const res = name === 'meta' ? await pool.query(sql) : await pool.query(sql, [start, asof]);
+    // ใส่วันที่เป็นค่าคงที่แทน $1/$2 (บาง SQL ใช้แค่ $2 หรือไม่ใช้พารามิเตอร์เลย) — วันที่ผ่านการตรวจรูปแบบแล้ว
+    const res = await pool.query(sql.replace(/\$1\b/g, "'" + start + "'").replace(/\$2\b/g, "'" + asof + "'"));
     const row = res.rows[0];
     fs.writeFileSync(path.join(ROOT, 'data', name + '.json'), JSON.stringify(row[Object.keys(row)[0]]));
     console.log('ok', name);
