@@ -13,3 +13,4 @@ keys/
 # เอกสารที่มียอดเงินรายลูกค้า — ส่งภายใน ไม่ขึ้น repo (GitHub Pages มักเป็น repo สาธารณะ)
 docs/validation_results.md
 docs/data_issues.md
+__pycache__/

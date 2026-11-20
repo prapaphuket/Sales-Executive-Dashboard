@@ -80,16 +80,18 @@ def main():
         summary[kind] = {'n': dict(n), 'amt': {k: round(v, 2) for k, v in s.items()},
                          'by_br': {b: {k: round(v, 2) for k, v in d.items()} for b, d in sorted(by_br.items())}}
 
-    bl_inv = [r for r in wd if r['k'] in ('BL', 'BF')]
+    bl_inv = [r for r in wd if r['k'] in ('BL', 'BF', 'BB')]
     recon('BL', bl_inv, t['bl'], active={'pending', 'paymented', 'active'})
-    rcpt = [r for r in wd if r['k'] in ('RV', 'RF')]
-    recon('RV', rcpt, t['iv'], active={'paymented', 'active'})
+    rcpt = [r for r in wd if r['k'] in ('RV', 'RF', 'RB')]
+    recon('RV', rcpt, t['iv'], active={'paymented', 'active', 'normal'})
     # ใบเสร็จที่ IV ใน TRCloud อ้างใบแจ้งหนี้ไม่ตรงกับ WMS
     ivx = {x['ref_no']: x for x in t['iv']}
     for r in rcpt:
         x = ivx.get(r['doc'])
         if x and r.get('ref') and x.get('bill') and x['bill'] != r['ref']:
-            reasons[('RV', 'bill_link_diff')] += 1; issues.append(['RV', r['doc'], 'bill_link_diff', r['br'], num(r['tot']), num(x['grand_total']), None])
+            # reference ตรงกับ WMS แต่ IV ไปผูกกับ BL อีกใบ → ใบที่ถูกตัดชำระใน TRCloud ผิดใบ (สถานะ BL ใน TRCloud คลาด)
+            why = 'bill_link_wrong' if x.get('reference') == r['ref'] else 'bill_link_diff'
+            reasons[('RV', why)] += 1; issues.append(['RV', r['doc'], why, r['br'], num(r['tot']), num(x['grand_total']), None])
     cn_w = [r for r in wd if r['k'] == 'CN']
     cn_t = t['cn'] or []
     summary['CN'] = {'wms_n': len(cn_w), 'wms_tot': round(sum(num(r['tot']) for r in cn_w), 2),

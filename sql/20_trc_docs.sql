@@ -1,6 +1,8 @@
 -- 20_trc_docs : รายการเอกสาร WMS ของเดือนกระทบยอดกับ TRCloud (เดือนเต็มล่าสุดก่อนวันอ้างอิง $2) — ไม่มีข้อมูลส่วนบุคคล
 -- ใช้คู่กับ scripts/trc_recon.py ที่อ่านไฟล์ TRCloud (ดึงผ่าน MCP เดือนละครั้ง) แล้วสร้าง data/trc_recon.json
--- k: BL = ใบแจ้งหนี้ค่าน้ำ (record_invoices) | BF = ใบแจ้งหนี้งานขาย (bill_invoice_fees) | RV = ใบเสร็จค่าน้ำ (record_bills) | RF = ใบเสร็จงานขาย (bill_fees) | CN = ใบลดหนี้
+-- k: BL = ใบแจ้งหนี้ค่าน้ำ (record_invoices) | BF = ใบแจ้งหนี้งานขาย (bill_invoice_fees) | BB = ใบแจ้งหนี้เงินประกันมิเตอร์ (bill_payment_bond_invoices)
+--    RV = ใบเสร็จค่าน้ำ (record_bills) | RF = ใบเสร็จงานขาย (bill_fees) | RB = ใบเสร็จเงินประกันมิเตอร์ (bill_payment_bonds) | CN = ใบลดหนี้
+--    เงินประกันมิเตอร์ไม่ใช่รายได้ (หนี้สิน) แต่ WMS ส่งเข้า TRCloud เป็น BL/IV เลขชุดเดียวกัน จึงต้องนับในการกระทบยอดเอกสาร
 -- วันที่: ใบแจ้งหนี้ = วันที่ออก · ใบเสร็จ = วันที่ออกใบเสร็จ (TRCloud ออก IV ตามวันนั้น) และเก็บวันที่รับชำระแยก · ปี พ.ศ. แปลงเป็น ค.ศ.
 -- $1 ไม่ใช้ (คงไว้ให้รูปแบบเหมือนไฟล์อื่น)
 with p as (select date_trunc('month', $2::date - interval '1 month')::date a, (date_trunc('month', $2::date) - interval '1 day')::date e, $1::date unused),
@@ -12,6 +14,12 @@ d as (
   union all
   select 'BF', f.invoice_number, f.bill_date, null, f.branch_id, f.status, f.subtotal::numeric, f.vat::numeric, f.total::numeric, f.trcloud_id is not null, null
   from bill_invoice_fees f, p where f.bill_date between p.a and p.e
+  union all
+  select 'BB', bi.invoice_number, bi.bill_date, null, bi.branch_id, bi.status, bi.subtotal::numeric, bi.vat::numeric, bi.total::numeric, bi.trcloud_id is not null, null
+  from bill_payment_bond_invoices bi, p where bi.bill_date between p.a and p.e
+  union all
+  select 'RB', bp.bill_number, bp.bill_date, bp.payment_date, bp.branch_id, bp.status, bp.subtotal::numeric, bp.vat::numeric, bp.total::numeric, bp.trcloud_id is not null, null
+  from bill_payment_bonds bp, p where bp.bill_date between p.a and p.e
   union all
   select 'RV', rb.bill_number, case when rb.issue_date > date '2400-01-01' then (rb.issue_date - interval '543 years')::date else rb.issue_date end,
          rb.payment_date, coalesce(i.branch_id, rb.branch_id), rb.status, rb.sum + rb.sum_service, rb.vat, rb.total, rb.trcloud_id is not null, i.invoice_number

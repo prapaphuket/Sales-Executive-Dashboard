@@ -19,7 +19,7 @@ for k in ['br', 'ty', 'src']:
     g = collections.defaultdict(float)
     for r in sr: g[r[k]] += r['net']
     chk(f'ยอดขาย: ผลรวมตาม {k} = ยอดรวม', sum(g.values()), tot, 0.01)
-chk('หน่วยน้ำ: ผลรวมแถว vs SQL', sum(r['units'] or 0 for r in sr), s['check']['units'], 0)
+chk('หน่วยน้ำ: ผลรวมแถว vs SQL', sum(r['units'] or 0 for r in sr), s['check']['units'], 0.5 * len(sr) ** 0.5 + 1, 'ใบนำเข้า Pay2Head มีหน่วยทศนิยม .5 — ปัดรายแถว')
 sep = [r for r in sr if r['m'] == '2026-09' and r['src'] == 'W']
 chk('ก.ย. 69 หน่วยน้ำ (ใบแจ้งหนี้ค่าน้ำ) vs ผลตรวจรับงวด 3', sum(r['units'] for r in sep), 227085, 0, 'ตรงกับรายงานมาตรฐาน')
 inc = sum(r['net'] + r['vat'] for r in sep)
@@ -28,7 +28,7 @@ chk('ก.ย. 69 ยอดรวม VAT (net+vat) vs ยอดใบแจ้ง
 dm = D('moo_monthly')
 wnet = sum(r['net'] for r in sr if r['src'] == 'W')
 chk('ยอดค่าน้ำตามหมู่ = ยอดใบแจ้งหนี้ค่าน้ำ (W)', sum(r[5] for r in dm['rows']), wnet, 0.5)
-chk('หน่วยน้ำตามหมู่ = หน่วยรวม', sum(r[6] for r in dm['rows']), s['check']['units'], 1, 'หน่วยมีทศนิยม ปัดรายแถว')
+chk('หน่วยน้ำตามหมู่ = หน่วยรวม', sum(r[6] for r in dm['rows']), s['check']['units'], 0.5 * len(dm['rows']) ** 0.5 + 1, 'หน่วยมีทศนิยม ปัดรายแถว')
 co = D('collections')
 chk('ยอดรับชำระ: ผลรวมแถว vs SQL', sum(r[5] for r in co['rows']), co['check']['amt'], 0.05)
 ar = D('ar'); arr = R(ar)
