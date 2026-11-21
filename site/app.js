@@ -902,16 +902,8 @@
     }
     if (mnProd) ins.push({ t: `งานซ่อมระบบผลิต/สูบน้ำค้าง ${int(mnProd.length)} ใบ (รอช่างรับงาน ${int(mnProd.filter((r) => r.st === 'wait').length)})`, e: 'ค้างนานสุด ' + (mnProd.length ? int(Math.max(...mnProd.map((r) => daysBetween(r.reported, MN.ref)))) + ' วัน' : '–') + ` · ข้อมูลไฟล์งานซ่อมถึง ${dLabel(String(MN.last).slice(0, 10))}`, l: ['#maint', 'ซ่อมบำรุง'] });
     if (S.d.trc_recon) { const R = S.d.trc_recon, w = (R.reasons || []).find((x) => x[1] === 'bill_link_wrong'); if (w) ins.push({ t: `ใบเสร็จ ${int(w[2])} ใบผูกใบแจ้งหนี้คนละใบใน TRCLOUD (รอบ ${mLabel(R.month)})`, e: 'กระทบสถานะลูกหนี้ใน TRCLOUD — ให้ผู้พัฒนาระบบตรวจ', l: ['#meter', 'จดมาตรและออกบิล'] }); }
-    return `<section class="ceo no-print" aria-label="สรุปสำหรับ CEO">
-      <div class="ceo-cards">
-        <a class="card ceo-card" href="#growth"><div class="ceo-l">Revenue · ยอดออกบิลตาม WMS</div><div class="ceo-v">${mb(rev([M]))}<small> ล้านบาท</small></div><div class="ceo-c">${mLabel(M)} · YTD ${mb(rev(ytd))} ล้าน (${pctTxt(chg(rev(ytd), rev(ytdP)))})</div>${src(`WMS Snapshot ณ ${dLabel(S.asof)} · ไม่รวม VAT`)}</a>
-        <a class="card ceo-card wait" href="#finance"><div class="ceo-l">Profit · ตามบัญชี</div><div class="ceo-v v-wait">รอยืนยัน</div><div class="ceo-c">ต้องใช้งบที่ปิดงวดจากฝ่ายบัญชี</div>${src('TRCLOUD งบต้องใช้ Data Warehouse (402)')}</a>
-        <a class="card ceo-card wait" href="#finance"><div class="ceo-l">Cash · เงินสด</div><div class="ceo-v v-wait">รอข้อมูล</div><div class="ceo-c">รับชำระค่าน้ำตามใบเสร็จ YTD ${mb(collAgg(Y + '-01', M).water)} ล้าน (ไม่ใช่ยอดเงินสด)</div>${src('ยังไม่มี bank statement / งบกระแสเงินสด')}</a>
-        <a class="card ceo-card wait" href="#salesov"><div class="ceo-l">Pipeline · การขาย</div><div class="ceo-v v-wait">รอข้อมูล</div><div class="ceo-c">${P ? `คำร้องติดตั้งค้าง ${int(P.nOpen)} ราย (เกิน 60 วัน ${int(P.over60)})` : 'ยังไม่มีทะเบียน Lead/Opportunity'}</div>${src('ยังไม่มีระบบ Lead/Opportunity · ที่มีคือคำร้องติดตั้งใน WMS')}</a>
-        <a class="card ceo-card" href="#customers"><div class="ceo-l">New Customers · ลูกค้าใหม่</div><div class="ceo-v">${int(nc(ytd))}<small> ราย</small></div><div class="ceo-c">ม.ค.–${mLabel(M)} · เดือน ${mLabel(M)} ${int(nc([M]))} ราย · ปีก่อน ${int(nc(ytdP))} ราย</div>${src('WMS · ใบแจ้งหนี้ค่าน้ำใบแรก ไม่นับลูกค้าสัญญา')}</a>
-      </div>
-      <div class="card ceo-ins"><h3>Insight ที่ควรติดตาม</h3><ol>${ins.slice(0, 5).map((x) => `<li><b>${esc(x.t)}</b> — ${esc(x.e)} <a href="${x.l[0]}">${esc(x.l[1])} →</a></li>`).join('')}</ol></div>
-    </section>`;
+    return card('c-ins', 'Insight ที่ควรติดตาม', 'อ้างอิงตัวเลขที่เห็นจริงในแต่ละหน้า · กดลิงก์ทางขวาเพื่อดูรายละเอียด', '',
+      `<ol class="acts">${ins.slice(0, 5).map((x, i) => `<li><span class="no">${i + 1}</span><div><div class="t1">${esc(x.t)}</div><div class="im">${esc(x.e)}</div></div><div class="rt"><a href="${x.l[0]}">${esc(x.l[1])} →</a></div></li>`).join('')}</ol>`, { min: 520 });
   }
 
   // ================= กลุ่มเมนู (ตามโครงแดชบอร์ดกลุ่ม AE) =================
@@ -1085,7 +1077,7 @@
   const PAGES = { snapshot: pSnapshot, revenue: pRevenue, sales: pSales, usage: pUsage, customers: pCustomers, collections: pCollections, meter: pMeter, finance: pFinance, projects: pProjects, maint: pMaint, salesov: pSalesOv, growth: pGrowth, datasrc: pDataSrc };
   // หัวหน้าแต่ละหน้า: ชื่อ + ตัวกรองที่มีผลกับหน้านั้นเท่านั้น
   const PAGE_META = {
-    snapshot: { t: 'Executive Snapshot', f: ['to', 'br', 'ty'], toL: 'เดือนรายงาน', sub: 'Revenue · Profit · Cash · Pipeline · New Customers พร้อมแหล่งข้อมูล ช่วงเวลา และวันอัปเดตของแต่ละตัว' },
+    snapshot: { t: 'Executive Snapshot', f: ['to', 'br', 'ty'], toL: 'เดือนรายงาน', sub: 'สรุปรายได้ ลูกค้า ลูกหนี้ และข้อเสนอแนะสำหรับผู้บริหาร · Insight ที่ควรติดตามอยู่ท้ายหน้า' },
     salesov: { t: 'ภาพรวมการขาย', f: ['from', 'to', 'br', 'ty'], sub: 'Sales Cycle คำร้องขอใช้น้ำ ลูกค้าใหม่ และรายได้เฉลี่ยต่อบัญชี · Lead/Opportunity/Win Rate แสดงสถานะรอข้อมูล' },
     revenue: { t: 'รายได้ตามกลุ่มลูกค้า', f: ['from', 'to', 'br', 'ty', 'moo'], sub: 'รายได้ตามใบแจ้งหนี้ WMS แยกกลุ่มลูกค้า สาขา และหมู่' },
     usage: { t: 'การใช้น้ำเทียบปีก่อน', f: ['from', 'to', 'br', 'ty'], sub: 'ปริมาณน้ำของลูกค้าเดิมเทียบช่วงเดียวกันปีก่อน · ผู้ใช้น้ำที่ลดลง' },
@@ -1659,7 +1651,6 @@
     const cmpS = (a, b) => cmpRow('', a, b)[1];
     const cmpC = (a, b) => cmpRow('', a, b)[2];
     el.innerHTML = `
-      ${ceoCards(M)}
       <div class="snap">
       <section class="snap-page">
         ${ph(`Executive Snapshot · รายได้ประจำเดือน ${mLong(M)}`, 'บริษัท ไฮโดรเอ็นเตอร์ไพร์ส แอนด์ อะควอดีซายน์ จำกัด · ' + scope, `ข้อมูล ณ ${dLabel(S.asof)}<br>${S.cfg.mode === 'live' ? 'LIVE' : 'SNAPSHOT'} · ดึง ${S.fetched ? dLabel(S.fetched.slice(0, 10)) : '–'}`)}
@@ -1704,6 +1695,7 @@
             <p class="small muted" style="margin:0 0 8px">ประมาณการทั้งปี ${mm(fc.fc)} ล้านบาท = ${fc.method}</p>
             <a class="small" href="#revenue">ดูรายละเอียดในหน้า รายได้ตามกลุ่มลูกค้า →</a>`, { w: 1, min: 380 })}
         </div>
+        <div class="row">${ceoCards(M)}</div>
       </section></div>`;
     // เก็บตัวเลขชุดเดียวกันไว้ให้สร้างไฟล์นำเสนอแยก (scripts/build-present.js)
     S.snapData = { M, Mp, My, asof: S.asof, fetched: S.fetched, br: S.f.br || null, ty: S.f.ty || null,
