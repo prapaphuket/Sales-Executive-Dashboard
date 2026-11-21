@@ -53,7 +53,7 @@
   --ctl: #8A8F98; --on-accent: #FFFFFF; --ch-orange: #C2620A; --row-sub: #F3F6FA; --hero: #2A3D7A;
   color-scheme: light;
 }
-/* ===== โหมดมืด: เลือกเอง หรือ “อัตโนมัติ” ตามเครื่อง ===== */
+/* ===== โหมดมืด (ปุ่ม "มืด") · ปุ่ม "ปกติ" และ "สว่าง" ใช้ค่าสีเนื้อหาชุดเดียวกับ :root ต่างกันที่แถบหัว ===== */
 :root[data-theme="dark"] {
   --bg: #0E1628; --card: #16213A; --fg: #E8EEF8; --heading: #C1E7F2; --text-2: #B4C0D6; --text-3: #9AA7C0;
   --line: #2A3754; --line-strong: #3A4A6C; --accent: #7BCCDF; --link: #9FD8E8; --side-bg: #1E2E5E; --side-active: #3C549A;
@@ -686,3 +686,54 @@ td.area{max-width:260px;width:260px}
 .msel-opt input { width: 16px; height: 16px; min-height: 0 !important; min-width: 0 !important; accent-color: var(--accent); }
 @media print { .msel-pop { display: none; } }
 .msel::after { content: ""; position: absolute; right: 12px; top: 50%; width: 7px; height: 7px; margin-top: -5px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); pointer-events: none; color: var(--fg); opacity: .8; }
+
+
+/* ======================================================================
+   ธีม 3 แบบ: ปกติ (หัวสีน้ำเงิน HEA) · มืด · สว่าง (หัวสีขาว) — แบบเดียวกับ PSG / SAM
+   ปุ่มเลือกธีมและแถบเมนูเป็น segmented control (กรอบโปร่ง + ปุ่มที่เลือกยกขึ้นเบา ๆ)
+   ====================================================================== */
+:root[data-theme="light"] { --bg: #FFFFFF; --hdr-line: #E3E8EF; }
+
+/* ปุ่มเลือกธีม */
+.hdr .seg { display: inline-flex; gap: 2px; padding: 4px; border-radius: 14px; background: rgba(255, 255, 255, .07); border: 1px solid rgba(255, 255, 255, .14); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04); }
+.hdr .seg button { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 14px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: #fff; opacity: .82; cursor: pointer; font: inherit; font-size: 14px; font-weight: 400; transition: background-color .18s ease, opacity .18s ease, box-shadow .18s ease; }
+.hdr .seg button svg { flex: none; }
+.hdr .seg button:hover { opacity: 1; background: rgba(255, 255, 255, .06); }
+.hdr .seg button:focus-visible { outline: 2px solid var(--hea-aqua); outline-offset: 1px; }
+.hdr .seg button[aria-pressed="true"] { opacity: 1; color: #fff; background: rgba(255, 255, 255, .16); border-color: rgba(255, 255, 255, .10); box-shadow: 0 1px 3px rgba(0, 0, 0, .22); font-weight: 500; }
+
+/* แถบเมนู 7 หน้า */
+.hdr-in { min-height: 72px; padding-top: 10px; padding-bottom: 10px; }
+.tabs { min-height: 0; align-self: center; align-items: center; gap: 2px; padding: 4px; border-radius: 14px; background: rgba(255, 255, 255, .07); border: 1px solid rgba(255, 255, 255, .14); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04); }
+.tabs a { min-height: 36px; padding: 0 12px; border: 1px solid transparent; border-bottom: 1px solid transparent; border-radius: 10px; color: #fff; opacity: .86; font-size: 14px; transition: background-color .18s ease, opacity .18s ease, box-shadow .18s ease; }
+.tabs a:hover { opacity: 1; background: rgba(255, 255, 255, .06); }
+.tabs a[aria-current="page"] { opacity: 1; font-weight: 500; background: rgba(255, 255, 255, .16); border-color: rgba(255, 255, 255, .10); border-bottom-color: rgba(255, 255, 255, .10); box-shadow: 0 1px 3px rgba(0, 0, 0, .22); }
+.tabs a:focus-visible { outline: 2px solid var(--hea-aqua); outline-offset: 1px; }
+
+/* ธีมมืด: หัวเข้มกลืนกับพื้น มีเส้นแบ่งบาง ๆ */
+:root[data-theme="dark"] .hdr { background: #121C33; border-bottom: 1px solid var(--line); }
+
+/* ธีมสว่าง: หัวขาว · โลโก้เปลี่ยนเป็นสีน้ำเงินเข้มอัตโนมัติ · กรอบเทาอ่อน ปุ่มที่เลือกเป็นขาวยกขึ้น */
+:root[data-theme="light"] .hdr { background: #FFFFFF; color: var(--heading); border-bottom: 1px solid var(--hdr-line); }
+.hdr .logo-on-light { display: none; }
+:root[data-theme="light"] .hdr .logo-on-dark { display: none; }
+:root[data-theme="light"] .hdr .logo-on-light { display: block; }
+:root[data-theme="light"] .tabs, :root[data-theme="light"] .hdr .seg { background: #EEF2F7; border-color: #DCE3EC; box-shadow: none; }
+:root[data-theme="light"] .tabs a, :root[data-theme="light"] .hdr .seg button { color: var(--hea-deep-navy); opacity: .9; }
+:root[data-theme="light"] .tabs a:hover, :root[data-theme="light"] .hdr .seg button:hover { opacity: 1; background: rgba(42, 61, 122, .06); }
+:root[data-theme="light"] .tabs a[aria-current="page"], :root[data-theme="light"] .hdr .seg button[aria-pressed="true"] { opacity: 1; color: var(--hea-deep-navy); background: #FFFFFF; border-color: #DCE3EC; box-shadow: 0 1px 3px rgba(20, 30, 60, .12); }
+:root[data-theme="light"] .tabs a:focus-visible, :root[data-theme="light"] .hdr .seg button:focus-visible { outline-color: var(--hea-navy); }
+:root[data-theme="light"] .hdr .userbar { color: var(--heading); }
+:root[data-theme="light"] .hdr .userbar button { color: var(--hea-navy); border-color: var(--line-strong); }
+
+/* ปุ่มสลับมุมมองในการ์ด (กราฟ/ตาราง · ตัวชี้วัด) ใช้รูปแบบเดียวกัน */
+.seg2 { gap: 2px; padding: 3px; border-radius: 12px; background: var(--row-sub); border: 1px solid var(--line); }
+.seg2 button { border: 1px solid transparent; border-radius: 9px; color: var(--text-2); transition: background-color .18s ease, color .18s ease, box-shadow .18s ease; }
+.seg2 button:hover { color: var(--fg); background: color-mix(in srgb, var(--fg) 5%, transparent); }
+.seg2 button[aria-pressed="true"] { background: var(--card); color: var(--heading); border-color: var(--line); box-shadow: 0 1px 3px rgba(20, 30, 60, .12); font-weight: 600; }
+:root[data-theme="dark"] .seg2 button[aria-pressed="true"] { background: var(--muted-bg); border-color: var(--line-strong); box-shadow: 0 1px 3px rgba(0, 0, 0, .35); }
+
+/* จอแคบ: ปุ่มธีมเหลือแค่ไอคอน ไม่ให้ข้อความตัดบรรทัด */
+@media (max-width: 9999px) and (max-width: 1px) { .hdr .seg button { padding: 0 10px; } .hdr .seg button span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; } }
+@media (max-width: 1100px) { .tabs a { min-height: 36px; padding: 0 9px; font-size: 13.5px; } }
+@media (prefers-reduced-motion: reduce) { .hdr .seg button, .tabs a, .seg2 button { transition: none; } }

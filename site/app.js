@@ -697,8 +697,8 @@
     });
   }
   function initTheme() {
-    const btns = document.querySelectorAll('.seg button');
-    const sync = () => { const p = window.HEATheme ? HEATheme.get() : 'auto'; btns.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.t === p))); };
+    const btns = document.querySelectorAll('#theme button');
+    const sync = () => { const p = window.HEATheme ? HEATheme.get() : 'hea'; btns.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.t === p))); };
     btns.forEach((b) => b.addEventListener('click', () => { if (window.HEATheme) HEATheme.set(b.dataset.t); }));
     document.addEventListener('hea-theme', () => { sync(); if (S.d.meta) render({ still: true }); });
     sync();
