@@ -638,19 +638,466 @@
         ${table(cols, used.slice(0, 20)).replace('data-csvable="1"', '')}`;
       $('t-mstuck-all').innerHTML = table(cols, used.concat(never.sort((a, b) => b.streak - a.streak)));
     } else $('t-mstuck').innerHTML = '<div class="state">ยังไม่มีข้อมูลมิเตอร์ไม่หมุน (ชุดข้อมูล meter_stuck)</div>';
+    el.insertAdjacentHTML('beforeend', trcBlock());
   }
+  // ================= หน้าเพิ่มตามโจทย์ CEO (21/11/69) =================
+  // หลัก: แต่ละหน้าทำงานได้แม้แหล่งอื่นยังไม่มีข้อมูล · ค่าที่ยังไม่มีแหล่งยืนยัน = "รอข้อมูล" / "รอยืนยัน" (ไม่ใช้ 0 แทน)
+  const NEWX_CEO = ['T2.2', 'T2.3', 'T3.1'];   // ลูกค้าสัญญา/ย้ายระบบ ไม่นับเป็นลูกค้าใหม่ (นิยามเดียวกับหน้าลูกค้า)
+  const TODAY_BKK = () => new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
+  const dShort = (d) => (d ? dLabel(d) : '–');
+  const daysBetween = (a, b) => Math.round((Date.parse(b.slice(0, 10)) - Date.parse(a.slice(0, 10))) / 86400000);
+  const median = (arr) => { const v = arr.filter((x) => x != null && isFinite(x)).sort((a, b) => a - b); if (!v.length) return null; const m = v.length >> 1; return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2; };
+  const durTxt = (min) => (min == null ? '–' : min < 60 ? `${nf0.format(min)} นาที` : min < 1440 ? `${nf1.format(min / 60)} ชม.` : `${nf1.format(min / 1440)} วัน`);
+  const waitKpi = (label, why, need, link) => `<div class="card kpi wait-kpi"><div class="k-top"><span class="label">${label}</span></div><div class="value v-wait">รอข้อมูล</div>
+    <div class="rows"><div><span class="k">เหตุผล</span><span class="v v-mute">${why}</span></div>${need ? `<div><span class="k">ต้องการ</span><span class="v v-mute">${need}</span></div>` : ''}</div>${link ? `<a class="klink" href="${link[0]}">${link[1]}</a>` : ''}</div>`;
+  const srcLine = (t) => `<div class="src-line">${t}</div>`;
+  const extLink = (url, t) => `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(t)}</a>`;
+  const ST_TH = { 'not started': 'ยังไม่เริ่ม', 'in progress': 'กำลังทำ', 'on hold': 'พักไว้', complete: 'เสร็จ', cancelled: 'ยกเลิก' };
+  const stPill = (s) => `<span class="pill ${s === 'complete' ? 'up' : s === 'cancelled' ? 'na' : s === 'on hold' ? 'warn' : s === 'in progress' ? 'info' : 'na'}">${ST_TH[s] || esc(s)}</span>`;
+
+  // ---------- การเงิน (TRCLOUD + WMS แยกแหล่ง ไม่บวกกัน) ----------
+  function finAgg() {
+    const F = S.d.finance; if (!F || !F.rows) return null;
+    const acc = Object.fromEntries(F.accounts.map((a) => [a.code, a]));
+    const rows = F.rows.map(([code, m, net, n]) => ({ code, m, net, n, grp: (acc[code] || {}).grp || 'other' }));
+    return { F, acc, rows };
+  }
+  function pFinance(el) {
+    setTitle('การเงิน · ยอดออกบิลตาม WMS และบัญชี TRCLOUD');
+    setScope('WMS Snapshot + TRCLOUD (GL อ่านอย่างเดียว)');
+    const lf = S.lastFull, Y = lf.slice(0, 4), ytd = monthsBetween(Y + '-01', lf), ly = addM(lf, -12), ytdP = monthsBetween(String(+Y - 1) + '-01', ly);
+    const wms = (ms) => sum(S.sales.filter((r) => ms.includes(r.m)), (r) => r.net);
+    const wY = wms(ytd), wP = wms(ytdP), wM = wms([lf]);
+    const coll = collAgg(Y + '-01', lf), ar = arAgg();
+    const FA = finAgg(), R = S.d.trc_recon;
+    const GRP = { power: 'ค่าไฟฟ้าระบบผลิต', chem: 'สารเคมี', svc: 'ค่าบริการระบบผลิต', repair: 'ซ่อมบำรุงเครื่องจักร/เครื่องมือ', parts: 'วัสดุสิ้นเปลืองและอะไหล่', office_power: 'ค่าไฟฟ้าสำนักงาน' };
+    let costHtml = '', costKpi = '';
+    if (FA) {
+      const { F, rows } = FA;
+      const gsum = (g, ms) => sum(rows.filter((r) => r.grp === g && ms.includes(r.m)), (r) => r.net);
+      const prodG = ['power', 'chem', 'svc', 'repair', 'parts'];
+      const pY = sum(prodG, (g) => gsum(g, ytd)), pP = sum(prodG, (g) => gsum(g, ytdP));
+      costKpi = kpi(`ต้นทุนระบบผลิตตาม GL ม.ค.–${mLabel(lf)}`, mb(pY), 'ล้านบาท', `รวมบัญชี ${F.accounts.filter((a) => prodG.includes(a.grp)).map((a) => a.code).join(', ')} · ${F.status}`, [['ต่อยอดออกบิล WMS ช่วงเดียวกัน', pct(wY ? pY / wY : null), 'v-mute'], ['เทียบปีก่อน', 'ไม่มีใน GL (เริ่ม ม.ค. 69)', 'v-mute']]);
+      const cats = monthsBetween(F.from.slice(0, 7), F.to.slice(0, 7));
+      const series = Object.keys(GRP).filter((g) => g !== 'office_power' && rows.some((r) => r.grp === g)).map((g, i) => ({ name: GRP[g], type: 'bar', stack: 'c', data: cats.map((m) => Math.round(gsum(g, [m]))), itemStyle: barStyle([C.navy, C.sky, C.oliveChart, C.orange, C.neutral, C.disc][i % 6]) }));
+      chartTable('c-fin-cost', cats.map(mLabel), series, 'b');
+      const accRows = F.accounts.map((a) => ({ ...a, y: sum(rows.filter((r) => r.code === a.code && ytd.includes(r.m)), (r) => r.net), p: sum(rows.filter((r) => r.code === a.code && ytdP.includes(r.m)), (r) => r.net), n: sum(rows.filter((r) => r.code === a.code && ytd.includes(r.m)), (r) => r.n) }));
+      costHtml = `<div class="grid g2" style="margin-top:16px">
+        ${card('c-fin-cost', 'ต้นทุนระบบผลิตรายเดือนตาม GL', `ล้านบาท · ${dShort(F.from)} – ${dShort(F.to)} · เดบิต − เครดิต · ไม่รวมค่าไฟฟ้าสำนักงาน`, '', '<div class="chart" id="ch-fin-cost" style="height:300px"></div>', { table: 1 })}
+        ${card('c-fin-acc', 'ต้นทุนแยกบัญชี (สะสมตั้งแต่ต้นปี)', `ม.ค.–${mLabel(lf)} · ยังไม่ใช่งบที่ปิดงวด · GL เริ่ม ม.ค. 69 จึงไม่เทียบปีก่อน`, '', table([
+          { h: 'บัญชี', f: (r) => `<b>${esc(r.code)}</b> ${esc(r.name)}` }, { h: 'กลุ่ม', f: (r) => esc(GRP[r.grp] || r.grp) },
+          { h: 'ม.ค.–' + mLabel(lf) + ' (บาท)', n: 1, f: (r) => baht(r.y), v: (r) => r.y.toFixed(2) }, { h: 'เฉลี่ย/เดือน', n: 1, f: (r) => baht(r.y / ytd.length), v: (r) => (r.y / ytd.length).toFixed(2) },
+          { h: 'สัดส่วน', n: 1, f: (r) => pct(sum(accRows, (x) => x.y) ? r.y / sum(accRows, (x) => x.y) : null) }, { h: 'รายการ GL', n: 1, f: (r) => int(r.n), v: (r) => r.n }],
+          accRows, [{ h: '<b>รวม</b>' }, null, { h: `<b>${baht(sum(accRows, (r) => r.y))}</b>`, v: sum(accRows, (r) => r.y).toFixed(2) }, null, null, { h: `<b>${int(sum(accRows, (r) => r.n))}</b>` }]), { csv: 1, foot: F.notes.map(esc).join('<br>') })}
+      </div>`;
+    } else {
+      costKpi = waitKpi('ต้นทุนระบบผลิตตาม GL', 'ยังไม่มีไฟล์ data/finance.json', 'ดึง GL บัญชีต้นทุนผลิตจาก TRCLOUD');
+    }
+    const trcLine = R ? `ใบแจ้งหนี้ ${mLong(R.month)}: WMS ${int(R.summary.BL.n.wms)} ใบ · พบใน TRCLOUD ${int(R.summary.BL.n.matched)} ใบ · ยอดตรง ${int(R.summary.BL.n.exact)} ใบ` : 'ยังไม่มีผลกระทบยอด';
+    el.innerHTML = `
+      <div class="note-box info"><b>อ่านหน้านี้อย่างไร:</b> "ยอดออกบิลตาม WMS" คือยอดใบแจ้งหนี้จากระบบบิลค่าน้ำ ส่วน "รายได้ตามบัญชี TRCLOUD" คือยอดที่ลงบัญชีแล้ว ทั้งสองแสดงแยกกันและไม่นำมาบวกกัน · กำไรจะแสดงเมื่อรายได้และต้นทุนมาจากงบบัญชีงวดเดียวกันที่ฝ่ายบัญชียืนยันแล้วเท่านั้น</div>
+      <div class="kpis" style="margin-top:12px">
+        ${kpi(`ยอดออกบิลตาม WMS ม.ค.–${mLabel(lf)}`, mb(wY), 'ล้านบาท', 'ยอดใบแจ้งหนี้ (ค่าน้ำ + ค่าบริการ + งานขาย) หลังหักส่วนลดและใบลดหนี้ ไม่รวม VAT · แหล่ง: WMS Snapshot', [cmpRow('YoY', wY, wP), ['เดือน ' + mLabel(lf), mb(wM) + ' ล้าน', 'v-mute']], 'target', { link: ['#revenue', 'ดูรายได้ตามกลุ่มลูกค้า →'] })}
+        ${waitKpi('รายได้ตามบัญชี TRCLOUD', 'รายงานงบของ TRCLOUD ต้องใช้แพ็กเกจ Data Warehouse (HTTP 402)', 'ไฟล์งบรายเดือนที่ฝ่ายบัญชียืนยัน')}
+        ${waitKpi('กำไร (ตามบัญชี)', 'ยังไม่มีรายได้และต้นทุนจากงบงวดเดียวกันที่ยืนยันแล้ว', 'งบกำไรขาดทุนที่ปิดงวดแล้ว')}
+        ${waitKpi('เงินสด ณ สิ้นเดือน', 'TRCLOUD ยังไม่มีการนำเข้า bank statement และรายงานกระแสเงินสดต้องใช้ Data Warehouse', 'ยอดเงินสด/งบกระแสเงินสดจากฝ่ายบัญชี')}
+        ${kpi(`รับชำระค่าน้ำ ม.ค.–${mLabel(lf)}`, mb(coll.water), 'ล้านบาท', 'ยอดตามใบเสร็จค่าน้ำใน WMS (รวม VAT) — ไม่ใช่เงินเข้าบัญชีธนาคาร · แหล่ง: WMS Snapshot', [['ลูกหนี้ค่าน้ำตาม WMS', mb(ar.total) + ' ล้าน', 'v-mute']], '', { link: ['#collections', 'ดูการจัดเก็บและลูกหนี้ →'] })}
+        ${costKpi}
+      </div>
+      ${costHtml}
+      <div class="grid g2" style="margin-top:16px">
+        ${card('c-fin-src', 'แหล่งข้อมูลและสถานะของตัวเลข', 'ใช้ตรวจว่าแต่ละตัวเลขมาจากไหนและยืนยันแล้วหรือยัง', '', table([{ h: 'ตัวเลข', k: 'k' }, { h: 'แหล่งหลัก', k: 's' }, { h: 'สถานะ', f: (r) => r.st }], [
+          { k: 'ยอดออกบิลค่าน้ำ ปริมาณน้ำ ลูกค้า', s: `WMS Snapshot ณ ${dLabel(S.asof)}`, st: '<span class="pill up">ใช้ได้</span>' },
+          { k: 'รับชำระและลูกหนี้ค่าน้ำ', s: 'WMS Snapshot (ตามใบเสร็จ)', st: '<span class="pill up">ใช้ได้</span> ยังไม่กระทบ statement' },
+          { k: 'ต้นทุนระบบผลิต', s: FA ? `TRCLOUD GL ดึง ${dShort(FA.F.pulled)}` : 'TRCLOUD GL', st: FA ? '<span class="pill warn">ผลเบื้องต้น</span> ยังไม่ยืนยันปิดงวด' : '<span class="pill na">รอข้อมูล</span>' },
+          { k: 'รายได้ตามบัญชี / กำไร', s: 'งบจากฝ่ายบัญชี', st: '<span class="pill na">รอข้อมูล</span>' },
+          { k: 'เงินสด / กระแสเงินสด', s: 'งบจากฝ่ายบัญชี หรือ bank statement ใน TRCLOUD', st: '<span class="pill na">รอข้อมูล</span>' },
+          { k: 'ภาระผูกพันตาม PO', s: 'TRCLOUD PO (ยังไม่ได้ดึง)', st: '<span class="pill na">รอข้อมูล</span> ไม่บวกกับยอดลงบัญชี' },
+        ]))}
+        ${card('c-fin-trc', 'การส่งเอกสาร WMS → TRCLOUD', R ? `รอบ ${mLong(R.month)} · ข้อมูล WMS ${dShort(R.wms_asof)} · ดึง TRCLOUD ${dShort(R.trc_pulled)}` : '', '', `<p>${esc(trcLine)}</p>
+          <p class="small muted">ยังยืนยันความครบถ้วนของการส่งไม่ได้ เพราะยังไม่มี log การส่งจาก API · รายละเอียดอยู่ในหน้าจดมาตรและออกบิล</p><a class="klink" href="#meter">ดูการติดตามเอกสาร →</a>`)}
+      </div>`;
+    if (FA) {
+      const t = tableStore['c-fin-cost'];
+      chart($('ch-fin-cost'), { grid: { left: 8, right: 16, top: 64, bottom: 8, containLabel: true }, xAxis: catAxis(t.cats), yAxis: valAxis(), series: t.series, tooltip: { ...chartTT(), formatter: ttMoney('b') } });
+    }
+  }
+
+  // ---------- โครงการ (ClickUp) ----------
+  function pProjects(el) {
+    const P = S.d.projects;
+    setTitle('โครงการ · ติดตามจาก ClickUp');
+    if (!P) { el.innerHTML = '<div class="card state">ยังไม่มีข้อมูลโครงการ (ไฟล์ data/projects.json จาก ClickUp)</div>'; return; }
+    setScope(`ClickUp Space HEA · ดึง ${dShort(P.fetched_at)}`);
+    const today = P.today || TODAY_BKK(), in30 = new Date(Date.parse(today) + 30 * 86400000).toISOString().slice(0, 10);
+    const isOpen = (s) => s !== 'complete' && s !== 'cancelled';
+    const proj = P.rows.filter((r) => r.kind === 'project'), other = P.rows.filter((r) => r.kind !== 'project');
+    const openP = proj.filter((r) => isOpen(r.status));
+    const late = [], soon = [];
+    P.rows.filter((r) => isOpen(r.status)).forEach((r) => {
+      if (r.due && r.due < today) late.push({ p: r, lvl: 'งานหลัก', id: r.id, n: r.name, d: r.due, url: r.url });
+      (r.late || []).forEach((k) => late.push({ p: r, lvl: 'งานย่อย/milestone', id: k.id, n: k.n, d: k.d, url: k.url }));
+      if (r.due && r.due >= today && r.due <= in30) soon.push({ p: r, lvl: 'งานหลัก', id: r.id, n: r.name, d: r.due, url: r.url });
+      if (r.next && r.next.d <= in30) soon.push({ p: r, lvl: 'งานย่อย/milestone', id: r.next.id, n: r.next.n, d: r.next.d, url: r.next.url });
+    });
+    late.sort((a, b) => (a.p.kind === 'project' ? 0 : 1) - (b.p.kind === 'project' ? 0 : 1) || a.d.localeCompare(b.d));
+    soon.sort((a, b) => a.d.localeCompare(b.d));
+    const lateP = late.filter((x) => x.p.kind === 'project');
+    const subTxt = (r) => r.kids.n ? `${int(r.kids.done)}/${int(r.kids.n - r.kids.cancel)} เสร็จ${r.kids.overdue ? ` · <span class="neg">เกินกำหนด ${int(r.kids.overdue)}</span>` : ''}${r.kids.nodate ? ` · <span class="muted">ไม่มีกำหนด ${int(r.kids.nodate)}</span>` : ''}` : '<span class="muted">ไม่มีงานย่อย</span>';
+    const duePill = (r) => (!r.due ? '<span class="muted">ไม่ระบุ</span>' : isOpen(r.status) && r.due < today ? `${dShort(r.due)}<br><span class="pill down">เกิน ${int(daysBetween(r.due, today))} วัน</span>` : dShort(r.due));
+    const pcols = [
+      { h: 'โครงการ / งานหลัก', f: (r) => `${extLink(r.url, r.name)}<br><span class="muted small">${esc(r.list)} · ID ${esc(r.id)}</span>${r.note ? `<br><span class="small muted">${esc(r.note)}</span>` : ''}`, v: (r) => r.name },
+      { h: 'สถานะ', f: (r) => stPill(r.status), v: (r) => ST_TH[r.status] || r.status }, { h: 'ผู้รับผิดชอบ', f: (r) => esc(r.owner || '—'), v: (r) => r.owner || '' },
+      { h: 'กำหนดส่ง', f: duePill, v: (r) => r.due || '' },
+      { h: 'Milestone ถัดไป', f: (r) => (r.next ? `${r.next.n ? extLink(r.next.url, r.next.n) : extLink(r.next.url, 'งานย่อย ' + r.next.id)}<br><span class="small muted">${dShort(r.next.d)}</span>` : '<span class="muted">–</span>'), v: (r) => (r.next ? `${r.next.n || r.next.id} (${r.next.d})` : '') },
+      { h: 'งานย่อย', f: subTxt, v: (r) => `${r.kids.done}/${r.kids.n - r.kids.cancel}` }, { h: 'อัปเดตล่าสุด', f: (r) => dShort(r.updated), v: (r) => r.updated || '' }];
+    const icols = [{ h: 'วันกำหนด', f: (x) => dShort(x.d), v: (x) => x.d }, { h: 'รายการ', f: (x) => (x.n ? extLink(x.url, x.n) : extLink(x.url, 'งาน ' + x.id)), v: (x) => x.n || x.id },
+      { h: 'ระดับ', k: 'lvl' }, { h: 'อยู่ใต้', f: (x) => esc(x.p.name), v: (x) => x.p.name }, { h: 'ผู้รับผิดชอบงานหลัก', f: (x) => esc(x.p.owner || '—'), v: (x) => x.p.owner || '' }];
+    const lateCols = icols.concat([{ h: 'เกินมา', n: 1, f: (x) => `${int(daysBetween(x.d, today))} วัน`, v: (x) => daysBetween(x.d, today) }]);
+    el.innerHTML = `
+      <div class="kpis">
+        ${kpi('โครงการที่ยังเปิดอยู่', int(openP.length), 'โครงการ', 'งานระดับบนสุดที่มีแผนงาน/milestone เป็นงานย่อยพร้อมกำหนดส่ง · ที่เหลือแสดงแยกเป็น "รอยืนยันว่าเป็นโครงการ"', [['กำลังทำ', int(openP.filter((r) => r.status === 'in progress').length), ''], ['พักไว้', int(openP.filter((r) => r.status === 'on hold').length), 'v-warn'], ['ยังไม่เริ่ม', int(openP.filter((r) => r.status === 'not started').length), 'v-mute']], 'target')}
+        ${kpi('เกินกำหนดในโครงการ', int(lateP.length), 'รายการ', 'งานหลักหรืองานย่อยของโครงการที่ยังไม่ปิดและเลยวันกำหนดตาม ClickUp (เวลา Asia/Bangkok) · ไม่นับงานที่เสร็จหรือยกเลิก', [['ทั้ง Space', int(late.length) + ' รายการ', 'v-mute']])}
+        ${kpi('ถึงกำหนดใน 30 วัน', int(soon.length), 'รายการ', `กำหนดส่งระหว่าง ${dShort(today)} – ${dShort(in30)}`, soon[0] ? [['ถัดไป', `${esc((soon[0].n || '').slice(0, 26))} · ${dShort(soon[0].d)}`, 'v-mute']] : [])}
+        ${kpi('รอยืนยันว่าเป็นโครงการ', int(other.filter((r) => isOpen(r.status)).length), 'รายการ', 'งานระดับบนสุดที่ยังไม่มีแผนงาน/ผลส่งมอบชัดในข้อมูลที่ดึงมา เช่น งานประจำ งานเจรจา งานติดตามสัญญา', [['ปิดแล้ว (เสร็จ)', int(P.rows.filter((r) => r.status === 'complete').length), 'v-mute'], ['ยกเลิก (ไม่แสดง)', int(P.cancelled_top || 0), 'v-mute']])}
+        ${waitKpi('Resource Utilization', 'ข้อมูลไม่พอ — ClickUp ไม่มีชั่วโมงทำงานจริงและชั่วโมงที่พร้อมใช้', 'Time tracking + ชั่วโมงงานต่อคน')}
+      </div>
+      <div class="grid" style="margin-top:16px">
+        ${card('c-proj', 'โครงการที่มีขอบเขตและผลส่งมอบชัด', `${int(proj.length)} โครงการ · สถานะตามที่บันทึกใน ClickUp · ไม่คำนวณ % ความคืบหน้าจากจำนวนงานย่อย`, '', table(pcols, proj.slice().sort((a, b) => isOpen(b.status) - isOpen(a.status) || (a.due || '9').localeCompare(b.due || '9'))), { csv: 1 })}
+      </div>
+      <div class="grid g2" style="margin-top:16px">
+        ${card('c-proj-late', 'งานที่เกินกำหนด', `เรียงโครงการก่อน แล้วตามวันกำหนด · ${int(late.length)} รายการ`, '', table(lateCols, late.slice(0, 40)) + (late.length > 40 ? `<p class="small muted">แสดง 40 จาก ${int(late.length)} รายการ · ดาวน์โหลด CSV ได้ครบจากตารางโครงการ</p>` : ''), { csv: 1 })}
+        ${card('c-proj-soon', 'กำหนดสำคัญใน 30 วันข้างหน้า', `${dShort(today)} – ${dShort(in30)}`, '', table(icols, soon), { csv: 1 })}
+      </div>
+      <div class="grid" style="margin-top:16px">
+        ${card('c-proj-other', 'งานระดับบนสุดอื่น — รอยืนยันว่าเป็นโครงการ', 'มีทั้งงานประจำ งานติดตามสัญญา/คดี และงานสนับสนุน · ผู้รับผิดชอบควรยืนยันขอบเขตและผลส่งมอบก่อนนับเป็นโครงการ', '', table(pcols, other.slice().sort((a, b) => isOpen(b.status) - isOpen(a.status) || a.list.localeCompare(b.list))), { csv: 1 })}
+      </div>
+      ${srcLine(`ที่มา: ${esc(P.source)} · ${esc(P.scope)} · ลิงก์ทุกแถวเปิดงานต้นทางใน ClickUp`)}`;
+  }
+
+  // ---------- ซ่อมบำรุง (ไฟล์ Excel ใบงานซ่อม) ----------
+  const MG = { all: 'ทั้งหมด', prod: 'ระบบผลิต/สูบน้ำ', it: 'IT Helpdesk/อุปกรณ์ IT', office: 'สำนักงาน/เครื่องใช้', veh: 'ยานพาหนะ', unk: 'จัดประเภทไม่ได้' };
+  const MST = { wait: 'รอช่างรับงาน', doing: 'กำลังซ่อม', eval: 'ซ่อมเสร็จรอประเมิน', closed: 'ปิดงาน' };
+  function pMaint(el) {
+    const M = S.d.maintenance;
+    setTitle('ซ่อมบำรุง · ใบงานแจ้งซ่อม');
+    if (!M) { el.innerHTML = '<div class="card state">ยังไม่มีข้อมูลใบงานซ่อม (ไฟล์ data/maintenance.json)</div>'; return; }
+    setScope(`ไฟล์ใบงานซ่อม ${int(M.n_unique)} ใบ · แจ้ง ${dShort(M.first)} – ${dShort(M.last)}`);
+    const g = S.mntGrp || 'all', ref = M.ref;
+    const all = M.rows, R = g === 'all' ? all : all.filter((r) => r.grp === g);
+    const open = R.filter((r) => r.st !== 'closed'), closed = R.filter((r) => r.st === 'closed'), nofix = closed.filter((r) => r.nofix);
+    const prodOpen = all.filter((r) => r.grp === 'prod' && r.st !== 'closed');
+    const mA = median(R.map((r) => r.min_assign)), nA = R.filter((r) => r.min_assign != null).length;
+    const doneR = R.filter((r) => r.done && r.min_done != null), mD = median(doneR.map((r) => r.min_done));
+    const techR = R.filter((r) => r.min_tech != null && r.tech_start && r.tech_end), mT = median(techR.map((r) => r.min_tech));
+    const impact = R.filter((r) => r.mstop || r.lstop);
+    const slaR = R.filter((r) => r.sla_h && r.done && r.min_done != null), slaOk = slaR.filter((r) => r.min_done <= r.sla_h * 60);
+    const tgtR = R.filter((r) => r.target && r.done), tgtOk = tgtR.filter((r) => r.done.slice(0, 10) <= r.target.slice(0, 10));
+    const ms = monthsBetween(M.first.slice(0, 7), ref.slice(0, 7));
+    const inS = { name: 'แจ้งเข้า (วันที่แจ้งซ่อม)', type: 'bar', data: ms.map((m) => R.filter((r) => r.reported.slice(0, 7) === m).length), itemStyle: barStyle(C.navy) };
+    const outS = { name: 'ซ่อมเสร็จ (วันเวลาที่ซ่อมเสร็จ)', type: 'bar', data: ms.map((m) => R.filter((r) => r.done && r.done.slice(0, 7) === m).length), itemStyle: barStyle(C.oliveChart) };
+    chartTable('c-mnt-m', ms.map(mLabel), [inS, outS], 'u');
+    const cnt = (key, rows) => { const o = {}; rows.forEach((r) => { const k = r[key] || 'ไม่ระบุ'; (o[k] = o[k] || { k, n: 0, open: 0 }).n++; if (r.st !== 'closed') o[k].open++; }); return Object.values(o).sort((a, b) => b.n - a.n); };
+    const qr = {}; R.filter((r) => r.qr).forEach((r) => { (qr[r.qr] = qr[r.qr] || []).push(r); });
+    const rep = Object.entries(qr).filter(([, l]) => l.length > 1).map(([q, l]) => ({ q, l, n: l.length, m: l[0].machine, open: l.filter((r) => r.st !== 'closed').length, last: l.map((r) => r.reported).sort().pop() })).sort((a, b) => b.n - a.n);
+    const age = (r) => daysBetween(r.reported, ref);
+    const ageB = (d) => (d <= 7 ? '≤ 7 วัน' : d <= 30 ? '8–30 วัน' : d <= 90 ? '31–90 วัน' : '> 90 วัน');
+    const unk = all.filter((r) => r.grp === 'unk');
+    const FA = finAgg();
+    const repairCost = FA ? (() => { const ytd = monthsBetween(S.lastFull.slice(0, 4) + '-01', S.lastFull); return { v: sum(FA.rows.filter((r) => r.grp === 'repair' && ytd.includes(r.m)), (r) => r.net), codes: FA.F.accounts.filter((a) => a.grp === 'repair').map((a) => a.code).join(', ') }; })() : null;
+    const segs = Object.entries(MG).filter(([k]) => k === 'all' || all.some((r) => r.grp === k)).map(([k, t]) => `<button type="button" data-mg="${k}" aria-pressed="${k === g}">${t} <small>${int(k === 'all' ? all.length : all.filter((r) => r.grp === k).length)}</small></button>`).join('');
+    $('head-tools').innerHTML = `<div class="seg2" role="group" aria-label="กลุ่มงานซ่อม">${segs}</div>`;
+    el.innerHTML = `
+      <div class="kpis">
+        ${kpi('ใบงานซ่อม', int(R.length), 'ใบ', `ใบงานไม่ซ้ำตามเลขที่ใบงาน · แจ้งระหว่าง ${dShort(M.first)} – ${dShort(M.last)}${g !== 'all' ? ' · กลุ่ม ' + MG[g] : ''}`, [['เปิดค้าง', int(open.length), open.length ? 'v-warn' : 'v-good'], ['ปิดงาน', int(closed.length), 'v-mute']], 'target')}
+        ${kpi('งานระบบผลิต/สูบน้ำค้าง', int(prodOpen.length), 'ใบ', 'ใบงานกลุ่มระบบผลิต/สูบน้ำที่ยังไม่ปิด (ไม่ขึ้นกับตัวกรองกลุ่ม)', [['รอช่างรับงาน', int(prodOpen.filter((r) => r.st === 'wait').length), 'v-bad'], ['ค้างนานสุด', prodOpen.length ? `${int(Math.max(...prodOpen.map(age)))} วัน` : '–', 'v-warn']])}
+        ${kpi('แจ้ง → มอบหมาย (มัธยฐาน)', mA == null ? '–' : nf1.format(mA / 1440), 'วัน', `ค่ามัธยฐานของคอลัมน์ "ระยะเวลาตั้งแต่แจ้งซ่อมถึงมอบหมาย" · ใช้ ${nA} ใบ`, [['แจ้ง → ซ่อมเสร็จ (ระบบ)', `${durTxt(mD)} · ${doneR.length} ใบ`, 'v-mute'], ['เวลาซ่อมที่ช่างบันทึก', `${durTxt(mT)} · ${techR.length} ใบ`, 'v-mute']])}
+        ${kpi('ปิดโดยไม่ได้ซ่อม', int(nofix.length), 'ใบ', 'ใบงานสถานะปิดงานที่รหัสผลการซ่อม = "ยกเลิกการซ่อม" — ไม่นับเป็นซ่อมสำเร็จ', [['ปิดและซ่อมแล้ว', int(closed.length - nofix.length), 'v-mute']])}
+        ${kpi('ใบงานที่บันทึกว่ามีผลกระทบ', int(impact.length), 'ใบ', 'นับใบงานที่สถานะเครื่องจักร = หยุดทำงาน หรือ ไลน์ผลิต = หยุดผลิต ตามที่บันทึก · ไม่คำนวณชั่วโมงหยุดผลิตเพราะไฟล์ไม่มีเวลาเริ่ม–สิ้นสุดการหยุดจริง', [['เครื่องหยุด', int(R.filter((r) => r.mstop).length), 'v-mute'], ['ไลน์ผลิตหยุด', int(R.filter((r) => r.lstop).length), 'v-mute']])}
+        ${kpi('เสร็จตาม SLA ที่บันทึก', slaR.length ? pct(slaOk.length / slaR.length) : '–', '', `เทียบเวลาแจ้ง→ซ่อมเสร็จ (ระบบ) กับ SLA ในระดับความด่วนของใบงาน เช่น "ด่วนมาก SLA 24 ชั่วโมง" · ใช้ได้ ${slaR.length} ใบ · ใบที่มีวันคาดว่าจะเสร็จ ${tgtR.length} ใบ (ตรงกำหนด ${tgtOk.length})`, [['ตาม SLA', `${slaOk.length}/${slaR.length} ใบ`, 'v-mute']])}
+      </div>
+      <div class="grid g2" style="margin-top:16px">
+        ${card('c-mnt-m', 'ใบงานแจ้งเข้าและซ่อมเสร็จรายเดือน', 'แจ้งเข้า = วันที่แจ้งซ่อมจริง · ซ่อมเสร็จ = วันเวลาที่ซ่อมเสร็จในระบบ', '', '<div class="chart" id="ch-mnt-m" style="height:280px"></div>', { table: 1 })}
+        ${card('c-mnt-st', 'สถานะใบงาน', 'แยก 4 สถานะ · ปิดงานแยกตามผลการซ่อม', '', table([{ h: 'สถานะ', k: 'k' }, { h: 'ใบงาน', n: 1, f: (x) => int(x.n), v: (x) => x.n }, { h: 'สัดส่วน', n: 1, f: (x) => pct(R.length ? x.n / R.length : null) }], [
+          { k: MST.wait, n: R.filter((r) => r.st === 'wait').length }, { k: MST.doing, n: R.filter((r) => r.st === 'doing').length }, { k: MST.eval, n: R.filter((r) => r.st === 'eval').length },
+          { k: 'ปิดงาน — ซ่อมแล้ว', n: closed.length - nofix.length }, { k: 'ปิดงาน — ไม่ได้ซ่อม (ยกเลิกการซ่อม)', n: nofix.length }]), { csv: 1 })}
+      </div>
+      <div class="grid" style="margin-top:16px">
+        ${card('c-mnt-open', 'ใบงานเปิดค้างตามอายุ', esc(M.ref_note), '', table([
+          { h: 'เลขที่ใบงาน', k: 'no' }, { h: 'กลุ่ม', f: (r) => esc(MG[r.grp]) }, { h: 'สถานะ', f: (r) => esc(MST[r.st] || r.st_raw) }, { h: 'เครื่องจักร/ทรัพย์สิน', f: (r) => `${esc(r.machine)}<br><span class="small muted">${esc(r.dept)}${r.qr ? ' · ' + esc(r.qr) : ''}</span>`, v: (r) => r.machine },
+          { h: 'อาการ', f: (r) => `<span class="sym" title="${esc(r.symptom)}">${esc(r.symptom)}</span>`, v: (r) => r.symptom }, { h: 'ความด่วน', f: (r) => esc(r.urg || '–'), v: (r) => r.urg || '' },
+          { h: 'แจ้งเมื่อ', f: (r) => dShort(r.reported), v: (r) => r.reported.slice(0, 10) }, { h: 'อายุ', n: 1, f: (r) => `<span class="pill ${age(r) > 30 ? 'down' : age(r) > 7 ? 'warn' : 'na'}">${int(age(r))} วัน</span>`, v: (r) => age(r) }, { h: 'ช่วงอายุ', f: (r) => ageB(age(r)) }],
+          open.slice().sort((a, b) => (a.grp === 'prod' ? 0 : 1) - (b.grp === 'prod' ? 0 : 1) || a.reported.localeCompare(b.reported))), { csv: 1 })}
+      </div>
+      <div class="grid g3" style="margin-top:16px">
+        ${card('c-mnt-dept', 'ตามแผนกของเครื่องจักร', '', '', table([{ h: 'แผนก', k: 'k' }, { h: 'ใบงาน', n: 1, f: (x) => int(x.n), v: (x) => x.n }, { h: 'ค้าง', n: 1, f: (x) => int(x.open), v: (x) => x.open }], cnt('dept', R)), { csv: 1 })}
+        ${card('c-mnt-type', 'ตามประเภทใบงาน', '', '', table([{ h: 'ประเภทใบงาน', k: 'k' }, { h: 'ใบงาน', n: 1, f: (x) => int(x.n), v: (x) => x.n }, { h: 'ค้าง', n: 1, f: (x) => int(x.open), v: (x) => x.open }], cnt('type', R)), { csv: 1 })}
+        ${card('c-mnt-mt', 'ตามประเภทเครื่องจักร', '', '', table([{ h: 'ประเภทเครื่องจักร', k: 'k' }, { h: 'ใบงาน', n: 1, f: (x) => int(x.n), v: (x) => x.n }, { h: 'ค้าง', n: 1, f: (x) => int(x.open), v: (x) => x.open }], cnt('mtype', R)), { csv: 1 })}
+      </div>
+      <div class="grid g2" style="margin-top:16px">
+        ${card('c-mnt-rep', 'เครื่องจักร/ทรัพย์สินที่แจ้งซ้ำ (QR Code เดียวกัน)', 'นับเฉพาะใบงานที่มี QR Code · ใช้ดูจุดที่เสียบ่อย', '', rep.length ? table([{ h: 'QR Code', k: 'q' }, { h: 'เครื่องจักร', f: (x) => esc(x.m), v: (x) => x.m }, { h: 'ใบงาน', n: 1, f: (x) => int(x.n), v: (x) => x.n }, { h: 'ค้าง', n: 1, f: (x) => int(x.open), v: (x) => x.open }, { h: 'แจ้งล่าสุด', f: (x) => dShort(x.last), v: (x) => x.last.slice(0, 10) }], rep) : '<div class="state">ไม่พบ QR Code ที่แจ้งซ้ำในกลุ่มนี้</div>', { csv: 1 })}
+        ${card('c-mnt-cost', 'ค่าซ่อมตามบัญชี TRCLOUD', 'ยอดรวมจากบัญชีค่าซ่อม · ไม่เฉลี่ยลงใบงานเพราะยังไม่มีเลขอ้างอิงที่เชื่อมใบงานกับเอกสารบัญชี', '', repairCost ? `<div class="big-num">${baht(repairCost.v)} <small>บาท</small></div><p class="small muted">ม.ค.–${mLabel(S.lastFull)} · บัญชี ${esc(repairCost.codes)} · ผลเบื้องต้นจาก GL ยังไม่ยืนยันปิดงวด</p><a class="klink" href="#finance">ดูหน้าการเงิน →</a>` : '<div class="state">รอข้อมูล GL ค่าซ่อมจาก TRCLOUD</div>')}
+      </div>
+      <div class="note-box info" style="margin-top:16px"><b>การจัดกลุ่ม:</b> ใช้ประเภทใบงานก่อน (งาน IT Helpdesk = IT) แล้วจึงใช้ประเภท/ชื่อเครื่องจักร (ระบบประปา ปั๊ม ถังคลอรีน สถานีผลิต แพสูบน้ำ = ระบบผลิต/สูบน้ำ) · จัดประเภทไม่ได้ ${int(unk.length)} ใบ${unk.length ? ': ' + unk.map((r) => esc(r.no)).join(', ') : ''} · คะแนนประเมินในไฟล์ส่วนใหญ่เป็น Auto Evaluate จึงไม่ใช้แทนความพึงพอใจของผู้แจ้ง</div>
+      ${srcLine(`ที่มา: ${esc(M.source)} · ${int(M.n_rows)} แถว · เลขที่ใบงานไม่ซ้ำ ${int(M.n_unique)}${M.dup_no.length ? ' · เลขซ้ำ ' + M.dup_no.join(', ') : ''}`)}`;
+    el.querySelectorAll('[data-mg]').forEach((b) => b.addEventListener('click', () => { S.mntGrp = b.dataset.mg; render({ still: true }); }));
+    $('head-tools').querySelectorAll('[data-mg]').forEach((b) => b.addEventListener('click', () => { S.mntGrp = b.dataset.mg; render({ still: true }); }));
+    const t = tableStore['c-mnt-m'];
+    chart($('ch-mnt-m'), { xAxis: catAxis(t.cats), yAxis: valAxis((v) => nf0.format(v)), series: t.series, tooltip: { ...chartTT(), formatter: ttMoney('u') } });
+  }
+
+  // ---------- ติดตามการส่งเอกสารเข้า TRCLOUD (ต่อท้ายหน้าจดมาตรและออกบิล) ----------
+  const TRC_WHY = { not_sent: 'ยังไม่ส่ง (ไม่มี trcloud_id)', missing_in_trc: 'ส่งแล้วแต่ไม่พบใน TRCLOUD', trc_cancelled: 'ยกเลิกใน TRCLOUD', cancelled_in_wms: 'ยกเลิกใน WMS แต่ TRCLOUD ยังใช้', multiple_in_trc: 'พบหลายใบใน TRCLOUD',
+    amount_diff: 'ยอดต่าง > 1 บาท', cross_month: 'ข้ามงวด', trc_only: 'มีใน TRCLOUD ไม่มีใน WMS', bill_link_wrong: 'ใบเสร็จผูกใบแจ้งหนี้คนละใบ', bill_link_diff: 'ใบเสร็จอ้างใบแจ้งหนี้ต่างจาก WMS' };
+  function trcBlock() {
+    const R = S.d.trc_recon;
+    if (!R) return `<div class="grid" style="margin-top:16px">${card('c-trc', 'ติดตามการส่งเอกสารเข้า TRCLOUD', '', '', '<div class="state">ยังไม่มีผลกระทบยอด (data/trc_recon.json)</div>')}</div>`;
+    const B = R.summary.BL, V = R.summary.RV, N = R.summary.CN;
+    const issues = rowsOf({ cols: ['kind', 'doc', 'reason', 'br', 'wms', 'trc', 'diff'], rows: R.issues || [] });
+    const sumRows = [
+      { k: 'ใบแจ้งหนี้ (WMS BL/BF/BB ↔ TRCLOUD BL)', w: B.n.wms, m: B.n.matched, e: B.n.exact, only: B.n.trc_only || 0, wt: B.amt.wms_tot, tt: B.amt.trc_tot, wv: B.amt.wms_vat, tv: B.amt.trc_vat },
+      { k: 'ใบเสร็จ (WMS RV/RF/RB ↔ TRCLOUD IV)', w: V.n.wms, m: V.n.matched, e: V.n.exact, only: V.n.trc_only || 0, wt: V.amt.wms_tot, tt: V.amt.trc_tot, wv: null, tv: V.amt.trc_vat },
+      { k: 'ใบลดหนี้ (WMS CN ↔ TRCLOUD CN)', w: N.wms_n, m: N.trc_n, e: null, only: 0, wt: N.wms_tot, tt: N.trc_tot, wv: null, tv: null },
+    ];
+    const brRows = ['BL', 'RV'].flatMap((k) => Object.entries(R.summary[k].by_br || {}).map(([br, x]) => ({ k: k === 'BL' ? 'ใบแจ้งหนี้' : 'ใบเสร็จ', br, ...x })));
+    return `
+      <h2 class="sec-title" style="margin-top:28px">ติดตามการส่งเอกสารเข้า TRCLOUD · รอบ ${mLong(R.month)}</h2>
+      <div class="note-box info">ขั้นต่อจากการออกบิล: เทียบเลขเอกสาร WMS กับ <code>ref_no</code> ใน TRCLOUD · ข้อมูล WMS ณ ${dShort(R.wms_asof)} · ดึง TRCLOUD ${dShort(R.trc_pulled)} · <b>ยังยืนยันความครบถ้วนของการส่งไม่ได้</b> เพราะยังไม่มี log การส่งจาก API จึงไม่คำนวณอัตราส่งสำเร็จ · การไม่พบคู่ไม่ได้แปลว่า API ล้มเหลวเสมอไป · รายได้ลงบัญชีครั้งเดียวตามวันที่ BL (IV ไม่ลงรายได้ซ้ำ)</div>
+      <div class="grid g2" style="margin-top:12px">
+        ${card('c-trc-sum', 'จำนวนและยอดเอกสาร', 'บาท รวม VAT · ยอดต่าง ≤ 1 บาทถือว่าปัดเศษ (TRCLOUD เก็บทศนิยม 4–9 ตำแหน่ง)', '', table([
+          { h: 'เอกสาร', k: 'k' }, { h: 'WMS', n: 1, f: (r) => int(r.w), v: (r) => r.w }, { h: 'พบคู่', n: 1, f: (r) => int(r.m), v: (r) => r.m }, { h: 'ยอดตรง', n: 1, f: (r) => (r.e == null ? '–' : int(r.e)), v: (r) => r.e ?? '' },
+          { h: 'มีเฉพาะ TRCLOUD', n: 1, f: (r) => int(r.only), v: (r) => r.only }, { h: 'ยอดรวม WMS', n: 1, f: (r) => baht(r.wt), v: (r) => r.wt }, { h: 'ยอดรวม TRCLOUD', n: 1, f: (r) => baht(r.tt), v: (r) => r.tt },
+          { h: 'VAT WMS', n: 1, f: (r) => baht(r.wv), v: (r) => r.wv ?? '' }, { h: 'VAT TRCLOUD', n: 1, f: (r) => baht(r.tv), v: (r) => r.tv ?? '' }], sumRows), { csv: 1, foot: `ใบแจ้งหนี้ก่อน VAT: WMS ${baht(B.amt.wms_pre)} · TRCLOUD ${baht(B.amt.trc_pre)} · TRCLOUD คำนวณ VAT รายบรรทัด จึงต่างเล็กน้อยแม้ยอดรวมตรง · ใบลดหนี้ ${int(N.wms_n)} ใบยังไม่ส่งเข้า TRCLOUD — รอบัญชียืนยันวิธีบันทึก` })}
+        ${card('c-trc-br', 'แยกสาขา', 'บาท รวม VAT', '', table([{ h: 'เอกสาร', k: 'k' }, { h: 'สาขา', k: 'br' }, { h: 'WMS (ใบ)', n: 1, f: (r) => int(r.wms_n), v: (r) => r.wms_n }, { h: 'พบคู่', n: 1, f: (r) => int(r.matched), v: (r) => r.matched }, { h: 'ยอด WMS', n: 1, f: (r) => baht(r.wms_tot), v: (r) => r.wms_tot }, { h: 'ยอด TRCLOUD', n: 1, f: (r) => baht(r.trc_tot), v: (r) => r.trc_tot }], brRows), { csv: 1 })}
+      </div>
+      <div class="grid g2 trc-g" style="margin-top:16px">
+        ${card('c-trc-why', 'รายการที่ต้องตรวจ แยกสาเหตุ', `${int(R.issues_total || issues.length)} รายการ`, '', table([{ h: 'เอกสาร', f: (r) => (r[0] === 'RV' ? 'ใบเสร็จ' : r[0] === 'BL' ? 'ใบแจ้งหนี้' : esc(r[0])) }, { h: 'สาเหตุ', f: (r) => esc(TRC_WHY[r[1]] || r[1]) }, { h: 'รายการ', n: 1, f: (r) => int(r[2]), v: (r) => r[2] }], R.reasons || []), { csv: 1 })}
+        ${card('c-trc-list', 'รายการเอกสารที่ต้องตรวจ', 'สำหรับฝ่ายบัญชีและผู้พัฒนาระบบ · ไม่มีข้อมูลส่วนบุคคล · เลื่อนดูในกรอบ', '', '<div class="scroll-box">' + table([{ h: 'เอกสาร', k: 'doc' }, { h: 'สาเหตุ', f: (r) => esc(TRC_WHY[r.reason] || r.reason), v: (r) => r.reason }, { h: 'สาขา', f: (r) => esc(r.br || '–') }, { h: 'WMS', n: 1, f: (r) => baht(r.wms), v: (r) => r.wms ?? '' }, { h: 'TRCLOUD', n: 1, f: (r) => baht(r.trc), v: (r) => r.trc ?? '' }, { h: 'ต่าง', n: 1, f: (r) => baht(r.diff), v: (r) => r.diff ?? '' }], issues) + '</div>', { csv: 1 })}
+      </div>`;
+  }
+
+  // ---------- การ์ด CEO บนหน้า Executive Snapshot ----------
+  function ceoCards(M) {
+    const Y = M.slice(0, 4), ytd = monthsBetween(Y + '-01', M), ytdP = monthsBetween(String(+Y - 1) + '-01', addM(M, -12));
+    const rev = (ms) => sum(S.sales.filter((r) => ms.includes(r.m) && okBr(r.br) && okTy(r.ty)), (r) => r.net);
+    const nc = (ms) => sum(S.cust.filter((r) => ms.includes(r.m) && okBr(r.br) && okTy(r.ty) && !NEWX_CEO.includes(r.ty)), (r) => r.new);
+    const P = pipeAgg(), PJ = S.d.projects, MN = S.d.maintenance;
+    const today = (PJ && PJ.today) || TODAY_BKK();
+    const pjLate = PJ ? PJ.rows.filter((r) => r.kind === 'project' && r.status !== 'complete' && r.status !== 'cancelled').reduce((a, r) => a + (r.due && r.due < today ? 1 : 0) + (r.kids.overdue || 0), 0) : null;
+    const mnProd = MN ? MN.rows.filter((r) => r.grp === 'prod' && r.st !== 'closed') : null;
+    const src = (t) => `<div class="ceo-src">${t}</div>`;
+    const ins = [];
+    ins.push({ t: `ยอดออกบิลตาม WMS ม.ค.–${mLabel(M)} ${mb(rev(ytd))} ล้านบาท (${pctTxt(chg(rev(ytd), rev(ytdP)))} YoY)`, e: 'ส่วนที่ลดลงมาจากสัญญาขายส่ง กปภ. ที่สิ้นสุดแล้ว — ดูการเติบโตแยกบริการ กลุ่มลูกค้า และพื้นที่', l: ['#growth', 'ภาพรวมการเติบโต'] });
+    if (S.d.finance) {
+      const FA = finAgg(), GN = { power: 'ค่าไฟฟ้าระบบผลิต', chem: 'สารเคมี', svc: 'ค่าบริการระบบผลิต', repair: 'ซ่อมบำรุง', parts: 'อะไหล่/วัสดุ' };
+      const lm = FA.F.to.slice(0, 7), pm = addM(lm, -1), gs = (g, m) => sum(FA.rows.filter((r) => r.grp === g && r.m === m), (r) => r.net);
+      const mv = Object.keys(GN).map((g) => ({ g, c: gs(g, lm), p: gs(g, pm) })).map((x) => ({ ...x, d: x.c - x.p })).sort((x, y) => Math.abs(y.d) - Math.abs(x.d));
+      const tc = sum(mv, (x) => x.c), tp = sum(mv, (x) => x.p), top = mv[0];
+      if (top && top.d) ins.push({ t: `ต้นทุนระบบผลิตตาม GL ${mLabel(lm)} ${mb(tc)} ล้านบาท (${tc >= tp ? '+' : '−'}${baht(Math.abs(tc - tp))} บาทจาก ${mLabel(pm)}) หมวดที่เปลี่ยนมากที่สุดคือ${GN[top.g]} ${top.d >= 0 ? '+' : '−'}${baht(Math.abs(top.d))} บาท`, e: 'ผลเบื้องต้นจากบัญชีแยกประเภท ยังไม่ยืนยันปิดงวด', l: ['#finance', 'ต้นทุนและบัญชี'] });
+    }
+    if (PJ) {
+      const nx = PJ.rows.filter((r) => r.kind === 'project' && r.status !== 'complete' && r.status !== 'cancelled').flatMap((r) => [r.next && r.next.d >= today ? { d: r.next.d, n: r.next.n, p: r.name } : null, r.due && r.due >= today ? { d: r.due, n: 'กำหนดเสร็จโครงการ', p: r.name } : null]).filter(Boolean).sort((x, y) => (x.d < y.d ? -1 : 1))[0];
+      if (nx) ins.push({ t: `งานโครงการที่ถึงกำหนดถัดไป: ${nx.n} (${nx.p}) กำหนด ${dLabel(nx.d)}`, e: `ทั้งหมดมีงานเกินกำหนด ${int(pjLate)} รายการตาม ClickUp — ตรวจว่าเป็นงานล่าช้าจริงหรือยังไม่อัปเดตสถานะ`, l: ['#projects', 'โครงการ'] });
+      else ins.push({ t: `โครงการมีงานเกินกำหนด ${int(pjLate)} รายการตาม ClickUp`, e: 'ยังไม่มีงานที่ตั้งกำหนดในอนาคต', l: ['#projects', 'โครงการ'] });
+    }
+    if (mnProd) ins.push({ t: `งานซ่อมระบบผลิต/สูบน้ำค้าง ${int(mnProd.length)} ใบ (รอช่างรับงาน ${int(mnProd.filter((r) => r.st === 'wait').length)})`, e: 'ค้างนานสุด ' + (mnProd.length ? int(Math.max(...mnProd.map((r) => daysBetween(r.reported, MN.ref)))) + ' วัน' : '–') + ` · ข้อมูลไฟล์งานซ่อมถึง ${dLabel(String(MN.last).slice(0, 10))}`, l: ['#maint', 'ซ่อมบำรุง'] });
+    if (S.d.trc_recon) { const R = S.d.trc_recon, w = (R.reasons || []).find((x) => x[1] === 'bill_link_wrong'); if (w) ins.push({ t: `ใบเสร็จ ${int(w[2])} ใบผูกใบแจ้งหนี้คนละใบใน TRCLOUD (รอบ ${mLabel(R.month)})`, e: 'กระทบสถานะลูกหนี้ใน TRCLOUD — ให้ผู้พัฒนาระบบตรวจ', l: ['#meter', 'จดมาตรและออกบิล'] }); }
+    return `<section class="ceo no-print" aria-label="สรุปสำหรับ CEO">
+      <div class="ceo-cards">
+        <a class="card ceo-card" href="#growth"><div class="ceo-l">Revenue · ยอดออกบิลตาม WMS</div><div class="ceo-v">${mb(rev([M]))}<small> ล้านบาท</small></div><div class="ceo-c">${mLabel(M)} · YTD ${mb(rev(ytd))} ล้าน (${pctTxt(chg(rev(ytd), rev(ytdP)))})</div>${src(`WMS Snapshot ณ ${dLabel(S.asof)} · ไม่รวม VAT`)}</a>
+        <a class="card ceo-card wait" href="#finance"><div class="ceo-l">Profit · ตามบัญชี</div><div class="ceo-v v-wait">รอยืนยัน</div><div class="ceo-c">ต้องใช้งบที่ปิดงวดจากฝ่ายบัญชี</div>${src('TRCLOUD งบต้องใช้ Data Warehouse (402)')}</a>
+        <a class="card ceo-card wait" href="#finance"><div class="ceo-l">Cash · เงินสด</div><div class="ceo-v v-wait">รอข้อมูล</div><div class="ceo-c">รับชำระค่าน้ำตามใบเสร็จ YTD ${mb(collAgg(Y + '-01', M).water)} ล้าน (ไม่ใช่ยอดเงินสด)</div>${src('ยังไม่มี bank statement / งบกระแสเงินสด')}</a>
+        <a class="card ceo-card wait" href="#salesov"><div class="ceo-l">Pipeline · การขาย</div><div class="ceo-v v-wait">รอข้อมูล</div><div class="ceo-c">${P ? `คำร้องติดตั้งค้าง ${int(P.nOpen)} ราย (เกิน 60 วัน ${int(P.over60)})` : 'ยังไม่มีทะเบียน Lead/Opportunity'}</div>${src('ยังไม่มีระบบ Lead/Opportunity · ที่มีคือคำร้องติดตั้งใน WMS')}</a>
+        <a class="card ceo-card" href="#customers"><div class="ceo-l">New Customers · ลูกค้าใหม่</div><div class="ceo-v">${int(nc(ytd))}<small> ราย</small></div><div class="ceo-c">ม.ค.–${mLabel(M)} · เดือน ${mLabel(M)} ${int(nc([M]))} ราย · ปีก่อน ${int(nc(ytdP))} ราย</div>${src('WMS · ใบแจ้งหนี้ค่าน้ำใบแรก ไม่นับลูกค้าสัญญา')}</a>
+      </div>
+      <div class="card ceo-ins"><h3>Insight ที่ควรติดตาม</h3><ol>${ins.slice(0, 5).map((x) => `<li><b>${esc(x.t)}</b> — ${esc(x.e)} <a href="${x.l[0]}">${esc(x.l[1])} →</a></li>`).join('')}</ol></div>
+    </section>`;
+  }
+
+  // ================= กลุ่มเมนู (ตามโครงแดชบอร์ดกลุ่ม AE) =================
+  // ลิงก์เดิม #revenue #usage #sales #customers #collections #meter ยังเปิดได้ — แต่ละหน้าอยู่ในกลุ่มเดียว
+  const GROUPS = [
+    { k: 'exec', t: 'Executive', pages: [['snapshot', 'Executive Snapshot']] },
+    { k: 'sales', t: 'การขาย', pages: [['salesov', 'ภาพรวมการขาย'], ['revenue', 'รายได้ตามกลุ่มลูกค้า'], ['sales', 'รายได้และการใช้น้ำ'], ['customers', 'ลูกค้า']] },
+    { k: 'fin', t: 'การเงิน', pages: [['finance', 'ต้นทุนและบัญชี'], ['collections', 'การจัดเก็บและลูกหนี้']] },
+    { k: 'proj', t: 'โครงการ', pages: [['projects', 'โครงการ (ClickUp)']] },
+    { k: 'strat', t: 'กลยุทธ์', pages: [['growth', 'ภาพรวมการเติบโต'], ['usage', 'การใช้น้ำเทียบปีก่อน']] },
+    { k: 'ops', t: 'ปฏิบัติการ', pages: [['meter', 'จดมาตรและออกบิล'], ['maint', 'ซ่อมบำรุง']] },
+    { k: 'data', t: 'สถานะข้อมูล', pages: [['datasrc', 'แหล่งข้อมูลและ KPI']] },
+  ];
+  const PAGE_GROUP = Object.fromEntries(GROUPS.flatMap((g) => g.pages.map(([p]) => [p, g])));
+  function renderNav() {
+    const g = PAGE_GROUP[S.page] || GROUPS[0];
+    $('nav').innerHTML = GROUPS.map((x) => `<a href="#${x.pages[0][0]}" data-g="${x.k}"${x === g ? ' aria-current="page"' : ''}>${x.t}</a>`).join('');
+    const bar = $('subbar');
+    bar.hidden = g.pages.length < 2;
+    $('subnav').innerHTML = g.pages.map(([p, t]) => `<a href="#${p}"${p === S.page ? ' aria-current="page"' : ''}>${t}</a>`).join('');
+  }
+
+  // ---------- ภาพรวมการขาย (การขาย) ----------
+  const PIPE_KN = { '1_residence': 'บ้านพักอาศัย', '2_rent_room': 'ห้องเช่า', '2_shop_household': 'ร้านค้า/บ้าน', '2_empty_land': 'ที่ดินเปล่า', '2_government': 'หน่วยงานราชการ', '2_other': 'อื่น ๆ', '3_public_company': 'บริษัทมหาชน', '3_large_business': 'ธุรกิจขนาดใหญ่', '?': 'ไม่ระบุ' };
+  // รายได้เฉลี่ยต่อบัญชี = (ค่าน้ำ + ค่าบริการ − ส่วนลด ไม่รวม VAT ของใบแจ้งหนี้ค่าน้ำ) ÷ จำนวนบัญชีที่ออกบิลรวมทุกเดือน → บาท/บัญชี/เดือน
+  function arpa(a, b, tyF) {
+    const okT = tyF || okTy;
+    const net = sum(S.sales.filter((r) => inR(r.m, a, b) && okBr(r.br) && okT(r.ty) && (r.src === 'W' || r.src === 'L')), (r) => r.net);
+    const am = sum(S.cust.filter((r) => inR(r.m, a, b) && okBr(r.br) && okT(r.ty)), (r) => r.active);
+    const n = monthsBetween(a, b).length;
+    return { net, am, avg: am ? am / n : 0, v: am ? net / am : null };
+  }
+  function pSalesOv(el) {
+    const { from, to } = S.f, pc = periodCompare();
+    const pf = addM(from, -12), pt = addM(to, -12);
+    const P = pipeAgg();
+    const doneIn = P ? P.done.filter((x) => inR(x.m, from, to)) : [];
+    const nDone = sum(doneIn, (x) => x.n), cyc = nDone ? sum(doneIn, (x) => x.d * x.n) / nDone : null;
+    const closed = P ? P.rows.filter((r) => r.status === 'completed' || r.status === 'cancelled') : [];
+    const nComp = sum(closed.filter((r) => r.status === 'completed'), (r) => r.n), nCan = sum(closed.filter((r) => r.status === 'cancelled'), (r) => r.n);
+    const nc = (a, b) => sum(S.cust.filter((r) => inR(r.m, a, b) && okBr(r.br) && okTy(r.ty) && !NEWX_CEO.includes(r.ty)), (r) => r.new);
+    const ncC = nc(from, to), ncP = pc.yoyOk ? nc(pf, pt) : null;
+    const A1 = arpa(from, to), A0 = pc.yoyOk ? arpa(pf, pt) : null;
+    const span = from === to ? mLong(to) : `${mLabel(from)}–${mLabel(to)}`;
+    setScope('WMS Snapshot · คำร้องขอใช้น้ำ + ใบแจ้งหนี้');
+    const wait = `<div class="grid g4">
+      ${waitKpi('Lead', 'ยังไม่มีระบบบันทึกผู้สนใจ/ผู้ติดต่อก่อนยื่นคำร้อง', 'ทะเบียน Lead จากฝ่ายกลยุทธ์ (แหล่ง วันที่ ผู้ดูแล)')}
+      ${waitKpi('Opportunity', 'ยังไม่มีทะเบียนดีลรายใหญ่/สัญญาที่กำลังเจรจา', 'รายการโอกาสพร้อมมูลค่าคาดการณ์และสถานะ')}
+      ${waitKpi('CLV', 'ยังไม่มีอายุลูกค้าเฉลี่ยและต้นทุนต่อบัญชีที่ยืนยัน — ใช้ “รายได้เฉลี่ยต่อบัญชี” ด้านล่างแทน', 'อัตราการเลิกใช้น้ำและกำไรต่อบัญชีจากบัญชี')}
+      ${kpi('อัตราคำร้องติดตั้งสำเร็จ', pct(nComp + nCan ? nComp / (nComp + nCan) : null), '', 'ใช้แทน Win Rate ไม่ได้โดยตรง: คำร้องที่ติดตั้งสำเร็จ ÷ คำร้องที่ปิดแล้ว (สำเร็จ + ยกเลิก) ทั้งหมดในระบบ ไม่แยกช่วงเวลา', [['สำเร็จ', int(nComp) + ' ราย'], ['ยกเลิก', int(nCan) + ' ราย']])}
+    </div>`;
+    const real = `<div class="grid g4">
+      ${kpi('Sales Cycle · ยื่นคำร้อง → เริ่มใช้น้ำ', cyc == null ? '–' : int(cyc), 'วัน', 'เฉลี่ยถ่วงจำนวนราย ของคำร้องที่เริ่มใช้น้ำในช่วงที่เลือก (ข้อมูลคำร้องเริ่ม มี.ค. 2569) · ไม่แยกสาขา/ประเภท', [['ติดตั้งในช่วง', int(nDone) + ' ราย'], ['ช่วง', span]], '', { link: ['#customers', 'ดูคำร้องในหน้าลูกค้า'] })}
+      ${kpi('คำร้องขอใช้น้ำที่ยังเปิด', P ? int(P.nOpen) : '–', 'ราย', 'สถานะรอดำเนินการ/กำลังดำเนินการ/อนุมัติรอติดตั้ง ณ วันดึงข้อมูล · ตัวกรองสาขามีผล', P ? [['เกิน 60 วัน', int(P.over60) + ' ราย', P.over60 ? 'down' : ''], ['ติดตั้งเฉลี่ย 6 เดือนล่าสุด', nf1.format(P.perMonth) + ' ราย/เดือน']] : null)}
+      ${kpi('ลูกค้าใหม่', int(ncC), 'ราย', 'ใบแจ้งหนี้ค่าน้ำใบแรกอยู่ในช่วงที่เลือก · ไม่นับลูกค้าสัญญาที่ย้ายเข้าระบบ (กปภ. อบต. ทอท.)', [ncP != null ? ['ปีก่อนช่วงเดียวกัน', `${int(ncP)} ราย`, ncC >= ncP ? 'up' : 'down'] : ['ปีก่อน', 'ไม่มีฐานเทียบ']])}
+      ${kpi('รายได้เฉลี่ยต่อบัญชี', A1.v == null ? '–' : int(A1.v), 'บาท/เดือน', 'ค่าน้ำ + ค่าบริการ − ส่วนลด (ไม่รวม VAT) ของใบแจ้งหนี้ค่าน้ำ ÷ จำนวนบัญชีที่ออกบิลรวมทุกเดือนในช่วง', [['บัญชีที่ออกบิลเฉลี่ย', int(A1.avg) + ' บัญชี/เดือน'], A0 && A0.v ? ['ปีก่อน', `${int(A0.v)} บาท (${pctTxt(chg(A1.v, A0.v))})`, A1.v >= A0.v ? 'up' : 'down'] : null])}
+    </div>`;
+    // ติดตั้งรายเดือน
+    const dn = P ? P.done : [];
+    const STN = { pending: 'รอดำเนินการ', processing: 'กำลังดำเนินการ', approved: 'อนุมัติแล้ว รอติดตั้ง' };
+    const open = P ? P.open : [];
+    const byK = {}; open.forEach((r) => { const o = byK[r.k] || (byK[r.k] = { k: r.k, n: 0, over60: 0, age: 0 }); o.n += r.n; o.over60 += r.over60; o.age += r.avg_age * r.n; });
+    const kRows = Object.values(byK).sort((a, b) => b.n - a.n);
+    el.innerHTML = `
+      ${srcLine('ที่มา: WMS Snapshot ณ ' + dLabel(S.asof) + ' · คำร้องขอใช้น้ำ (ตารางคำร้อง) + ใบแจ้งหนี้ค่าน้ำ · ไม่ใช้ข้อมูลบัญชี TRCLOUD ในหน้านี้')}
+      <h2 class="sec-title">ตัวชี้วัดที่ข้อมูลรองรับ · ${esc(span)}</h2>${real}
+      <h2 class="sec-title">ตัวชี้วัดการขายที่ยังไม่มีแหล่งข้อมูล</h2>${wait}
+      <div class="grid g2">
+        ${card('c-so-done', 'ติดตั้งใหม่และระยะเวลาเฉลี่ยรายเดือน', 'คำร้องที่เริ่มใช้น้ำ (นับตามเดือนที่เริ่มใช้น้ำ) · ระยะเวลา = วันที่ยื่นคำร้องถึงวันเริ่มใช้น้ำ', '', table([{ h: 'เดือน', f: (r) => mLabel(r.m), v: (r) => r.m }, { h: 'ติดตั้ง (ราย)', n: 1, f: (r) => int(r.n), v: (r) => r.n }, { h: 'เฉลี่ย (วัน)', n: 1, f: (r) => int(r.d), v: (r) => r.d }], dn.slice().reverse(), ['รวม', int(sum(dn, (x) => x.n)), '']), { csv: 1 })}
+        ${card('c-so-open', 'คำร้องที่ยังเปิด แยกประเภทผู้ขอ', 'ณ วันดึงข้อมูล · ตัวกรองสาขามีผล · อายุ = วันนับจากยื่นคำร้อง', 'สาขา', table([{ h: 'ประเภทผู้ขอ', f: (r) => esc(PIPE_KN[r.k] || r.k) }, { h: 'ราย', n: 1, f: (r) => int(r.n), v: (r) => r.n }, { h: 'อายุเฉลี่ย (วัน)', n: 1, f: (r) => int(r.age / r.n), v: (r) => r.age / r.n }, { h: 'เกิน 60 วัน', n: 1, f: (r) => int(r.over60), v: (r) => r.over60 }], kRows, ['รวม', int(sum(kRows, (r) => r.n)), '', int(sum(kRows, (r) => r.over60))]) + `<div class="small" style="margin-top:8px">${Object.entries(STN).map(([k, t]) => `${t} ${int(sum(open.filter((r) => r.status === k), (r) => r.n))} ราย`).join(' · ')}</div>`, { csv: 1 })}
+      </div>`;
+  }
+
+  // ---------- ภาพรวมการเติบโต (กลยุทธ์) ----------
+  function pGrowth(el) {
+    const { from, to } = S.f, pc = periodCompare();
+    const pf = addM(from, -12), pt = addM(to, -12), yo = pc.yoyOk;
+    const span = from === to ? mLong(to) : `${mLabel(from)}–${mLabel(to)}`, spanP = from === to ? mLong(pt) : `${mLabel(pf)}–${mLabel(pt)}`;
+    setScope('WMS Snapshot · ใบแจ้งหนี้ ไม่รวม VAT');
+    const cur = salesAgg(from, to), prv = yo ? salesAgg(pf, pt) : null;
+    const rows = (a, b) => S.sales.filter((r) => inR(r.m, a, b) && okBr(r.br) && okTy(r.ty));
+    const exP = (a, b) => sum(rows(a, b).filter((r) => r.ty !== 'T2.2'), (r) => r.net);
+    const eC = exP(from, to), eP = yo ? exP(pf, pt) : null;
+    const A1 = arpa(from, to), A0 = yo ? arpa(pf, pt) : null;
+    const cmp = (c, p) => (p == null ? '<span class="v-mute">ไม่มีฐานเทียบ</span>' : `<span class="${c >= p ? 'up' : 'down'}">${c >= p ? '▲' : '▼'} ${pctTxt(chg(c, p))}</span>`);
+    const gcol = (lab, kf) => [{ h: lab, f: kf }, { h: span, n: 1, f: (r) => baht(r.c), v: (r) => r.c }, { h: spanP, n: 1, f: (r) => (yo ? baht(r.p) : '–'), v: (r) => r.p ?? '' }, { h: 'เปลี่ยน (บาท)', n: 1, f: (r) => (yo ? `<span class="${r.c - r.p >= 0 ? 'up' : 'down'}">${r.c - r.p >= 0 ? '+' : ''}${baht(r.c - r.p)}</span>` : '–'), v: (r) => (yo ? r.c - r.p : '') }, { h: 'เปลี่ยน (%)', n: 1, f: (r) => (yo ? cmp(r.c, r.p) : '–') }, { h: 'สัดส่วน', n: 1, f: (r) => pct(cur.net ? r.c / cur.net : null) }];
+    // ตามบริการ
+    const svc = [
+      { k: 'ค่าน้ำ', c: cur.water - cur.disc, p: prv ? prv.water - prv.disc : null },
+      { k: 'ค่าบริการรายเดือน', c: cur.service, p: prv ? prv.service : null },
+      { k: 'งานขาย/ค่าติดตั้ง', c: cur.fee, p: prv ? prv.fee : null },
+      { k: 'ใบลดหนี้', c: cur.cn, p: prv ? prv.cn : null },
+    ];
+    const svcOther = cur.net - sum(svc, (r) => r.c), svcOtherP = prv ? prv.net - sum(svc, (r) => r.p) : null;
+    if (Math.abs(svcOther) >= 1 || (svcOtherP != null && Math.abs(svcOtherP) >= 1)) svc.push({ k: 'ปรับ VAT ส่วนลด/อื่น ๆ', c: svcOther, p: svcOtherP });
+    const grpBy = (key, nameF) => {
+      const m = {}; rows(from, to).forEach((r) => { (m[r[key]] = m[r[key]] || { k: r[key], c: 0, p: 0 }).c += r.net; });
+      if (yo) rows(pf, pt).forEach((r) => { (m[r[key]] = m[r[key]] || { k: r[key], c: 0, p: 0 }).p += r.net; });
+      return Object.values(m).map((o) => ({ ...o, name: nameF(o.k) })).sort((a, b) => b.c - a.c);
+    };
+    const byTy = grpBy('ty', (k) => TY_NAME[k] || k), byBr = grpBy('br', (k) => k);
+    // หมู่: ใช้ moo_monthly (ใบแจ้งหนี้ค่าน้ำ)
+    const mm = {}; S.mooM.filter((r) => okBr(r.br) && okTy(r.ty)).forEach((r) => { const key = r.br + '|' + r.moo; const o = mm[key] || (mm[key] = { k: key, name: `${r.moo} · ${r.br}`, c: 0, p: 0 }); if (inR(r.m, from, to)) o.c += r.net; if (yo && inR(r.m, pf, pt)) o.p += r.net; });
+    const moo = Object.values(mm).filter((o) => o.c || o.p).sort((a, b) => Math.abs(b.c - b.p) - Math.abs(a.c - a.p)).slice(0, 12);
+    // ARPA ตามประเภท
+    const tys = [...new Set(S.cust.filter((r) => inR(r.m, from, to) && okBr(r.br) && okTy(r.ty)).map((r) => r.ty))];
+    const arTy = tys.map((t) => { const f = (x) => x === t; const a = arpa(from, to, f), b = yo ? arpa(pf, pt, f) : null; return { t, a, b }; }).filter((x) => x.a.am).sort((x, y) => y.a.net - x.a.net);
+    // Insight
+    const ins = [];
+    if (yo) {
+      const mv = byTy.map((o) => ({ ...o, d: o.c - o.p })).sort((a, b) => a.d - b.d);
+      const dn = mv[0], up = mv[mv.length - 1];
+      if (dn && dn.d < 0) ins.push({ t: `กลุ่มที่รายได้ลดมากที่สุด: ${dn.name} −${mb(-dn.d)} ล้านบาท เทียบ ${spanP}`, l: ['#revenue', 'ดูรายได้ตามกลุ่มลูกค้า'] });
+      if (up && up.d > 0) ins.push({ t: `กลุ่มที่รายได้เพิ่มมากที่สุด: ${up.name} +${mb(up.d)} ล้านบาท`, l: ['#revenue', 'ดูรายได้ตามกลุ่มลูกค้า'] });
+      const md = moo.filter((o) => o.c - o.p < 0)[0];
+      if (md) ins.push({ t: `พื้นที่ที่รายได้ค่าน้ำลดมากที่สุด: ${md.name} −${baht(md.p - md.c)} บาท`, l: ['#usage', 'ดูการใช้น้ำเทียบปีก่อน'] });
+      if (A0 && A0.v) ins.push({ t: `รายได้เฉลี่ยต่อบัญชี ${int(A1.v)} บาท/เดือน (${pctTxt(chg(A1.v, A0.v))}) ขณะที่บัญชีที่ออกบิลเฉลี่ย ${int(A1.avg)} บัญชี/เดือน (${pctTxt(chg(A1.avg, A0.avg))})`, l: ['#customers', 'ดูลูกค้า'] });
+    }
+    el.innerHTML = `
+      ${srcLine(`ที่มา: WMS Snapshot ณ ${dLabel(S.asof)} · เทียบ ${esc(span)} กับ ${esc(spanP)} (ช่วงเดียวกันปีก่อน) · ไม่คำนวณ CLV · ไม่รวมกับรายได้ตามบัญชี TRCLOUD`)}
+      <div class="grid g4">
+        ${kpi('รายได้รวม (ไม่รวม VAT)', mb(cur.net), 'ล้านบาท', 'ค่าน้ำ + ค่าบริการ + งานขาย − ส่วนลด − ใบลดหนี้ ตามใบแจ้งหนี้ WMS', [['ปีก่อน', prv ? `${mb(prv.net)} ล้าน` : 'ไม่มีฐานเทียบ'], prv ? ['เปลี่ยน', pctTxt(chg(cur.net, prv.net)), cur.net >= prv.net ? 'up' : 'down'] : null])}
+        ${kpi('รายได้ไม่รวม กปภ.', mb(eC), 'ล้านบาท', 'ตัดสัญญาขายส่ง กปภ. (T2.2) ที่สิ้นสุดแล้วออก เพื่อดูการเติบโตของลูกค้าที่ยังใช้น้ำอยู่', [['ปีก่อน', eP != null ? `${mb(eP)} ล้าน` : 'ไม่มีฐานเทียบ'], eP ? ['เปลี่ยน', pctTxt(chg(eC, eP)), eC >= eP ? 'up' : 'down'] : null])}
+        ${kpi('รายได้เฉลี่ยต่อบัญชี', A1.v == null ? '–' : int(A1.v), 'บาท/เดือน', 'ค่าน้ำ + ค่าบริการ − ส่วนลด (ไม่รวม VAT) ÷ จำนวนบัญชีที่ออกบิลรวมทุกเดือนในช่วง', [A0 && A0.v ? ['ปีก่อน', `${int(A0.v)} บาท`] : ['ปีก่อน', 'ไม่มีฐานเทียบ'], A0 && A0.v ? ['เปลี่ยน', pctTxt(chg(A1.v, A0.v)), A1.v >= A0.v ? 'up' : 'down'] : null])}
+        ${kpi('บัญชีที่ออกบิลเฉลี่ย', int(A1.avg), 'บัญชี/เดือน', 'จำนวนผู้ใช้น้ำที่มีใบแจ้งหนี้ค่าน้ำในแต่ละเดือน เฉลี่ยทั้งช่วง', [A0 ? ['ปีก่อน', `${int(A0.avg)} บัญชี`] : ['ปีก่อน', 'ไม่มีฐานเทียบ'], A0 ? ['เปลี่ยน', pctTxt(chg(A1.avg, A0.avg)), A1.avg >= A0.avg ? 'up' : 'down'] : null])}
+      </div>
+      ${ins.length ? `<div class="card ceo-ins"><h3>Insight การเติบโต</h3><ol>${ins.map((x) => `<li><b>${esc(x.t)}</b> <a href="${x.l[0]}">${esc(x.l[1])} →</a></li>`).join('')}</ol></div>` : ''}
+      <div class="grid g2">
+        ${card('c-gr-svc', 'การเติบโตตามบริการ', 'ใบแจ้งหนี้ WMS ไม่รวม VAT · ค่าน้ำหักส่วนลดแล้ว', 'สาขา ประเภท', table(gcol('บริการ', (r) => esc(r.k)), svc, ['รวม', baht(cur.net), prv ? baht(prv.net) : '–', prv ? baht(cur.net - prv.net) : '–', prv ? cmp(cur.net, prv.net) : '–', '100%']), { csv: 1 })}
+        ${card('c-gr-br', 'การเติบโตตามพื้นที่ (สาขา/ตำบล)', 'ใบแจ้งหนี้ทุกประเภท ไม่รวม VAT', 'สาขา ประเภท', table(gcol('สาขา', (r) => esc(r.name)), byBr), { csv: 1 })}
+        ${card('c-gr-ty', 'การเติบโตตามกลุ่มลูกค้า', 'ใบแจ้งหนี้ทุกประเภท ไม่รวม VAT · กปภ. (T2.2) สัญญาสิ้นสุดแล้ว', 'สาขา ประเภท', table(gcol('กลุ่มลูกค้า', (r) => esc(r.name)), byTy), { csv: 1, w: 2 })}
+        ${card('c-gr-moo', 'หมู่ที่รายได้ค่าน้ำเปลี่ยนมากที่สุด', '12 อันดับตามขนาดการเปลี่ยนแปลง · ใบแจ้งหนี้ค่าน้ำเท่านั้น (ไม่รวมงานขาย) · หมู่ตามทะเบียนปัจจุบัน', 'สาขา ประเภท', table(gcol('หมู่ · สาขา', (r) => esc(r.name)).slice(0, 5), moo), { csv: 1 })}
+        ${card('c-gr-arpa', 'รายได้เฉลี่ยต่อบัญชี แยกกลุ่มลูกค้า', 'บาท/บัญชี/เดือน · ค่าน้ำ + ค่าบริการ − ส่วนลด (ไม่รวม VAT)', 'สาขา ประเภท', table([{ h: 'กลุ่มลูกค้า', f: (x) => esc(TY_NAME[x.t] || x.t) }, { h: 'บัญชีเฉลี่ย/เดือน', n: 1, f: (x) => nf1.format(x.a.avg), v: (x) => x.a.avg }, { h: 'รายได้เฉลี่ยต่อบัญชี', n: 1, f: (x) => baht(x.a.v), v: (x) => x.a.v }, { h: 'ปีก่อน', n: 1, f: (x) => (x.b && x.b.v ? baht(x.b.v) : '–'), v: (x) => (x.b && x.b.v) ?? '' }, { h: 'เปลี่ยน', n: 1, f: (x) => (x.b && x.b.v ? cmp(x.a.v, x.b.v) : '–') }], arTy), { csv: 1 })}
+      </div>`;
+  }
+
+  // ---------- แหล่งข้อมูลและสถานะ KPI (สถานะข้อมูล) ----------
+  function pDataSrc(el) {
+    setScope('สถานะแหล่งข้อมูลทุกหน้า');
+    const snap = S.cfg.snapshot || {}, F = S.d.finance, PJ = S.d.projects, MN = S.d.maintenance, R = S.d.trc_recon;
+    const ok = (t) => `<span class="pill up">${t}</span>`, wt = (t) => `<span class="pill warn">${t}</span>`, na = (t) => `<span class="pill na">${t}</span>`;
+    const src = [
+      ['WMS (ฐานข้อมูลค่าน้ำ)', 'PostgreSQL hea_uat · อ่านอย่างเดียว · Snapshot', snap.asof ? dLabel(snap.asof) : dLabel(S.asof), `${dLabel(S.d._start || snap.start)} – ${dLabel(S.asof)}`, ok('ใช้ได้'), 'รายได้ตามใบแจ้งหนี้ ลูกค้า การใช้น้ำ ลูกหนี้ คำร้อง จดมาตร'],
+      ['TRCLOUD · บัญชีแยกประเภท', 'HEA-TRCLOUD get_ledger · อ่านอย่างเดียว', F ? dLabel(F.pulled) : '–', F ? `${dLabel(F.from)} – ${dLabel(F.to)}` : '–', F ? wt('บางบัญชี') : na('ไม่มีไฟล์'), 'ต้นทุนระบบผลิต 7 บัญชี · ไม่มีงบกำไรขาดทุน/กระแสเงินสด (รายงานต้องใช้แพ็กเกจ Data Warehouse)'],
+      ['TRCLOUD · กระทบยอด BL/IV/RV', 'เอกสารขาย TRCLOUD เทียบ WMS', R ? dLabel(R.trc_pulled) : '–', R ? mLong(R.month) : '–', R ? ok('ใช้ได้') : na('ไม่มีไฟล์'), 'ติดตามเอกสารที่ส่งไม่ครบ/ผูกผิด · ไม่ใช้ PO/AP/EXP · ไม่นำยอดไปบวกกับ WMS'],
+      ['ClickUp · Space HEA', 'Workspace 90182760752 · อ่านอย่างเดียว', PJ ? dLabel(String(PJ.fetched_at).slice(0, 10)) : '–', PJ ? 'ทุกงานที่ไม่ปิด/ปิดแล้ว' : '–', PJ ? ok('ใช้ได้') : na('ไม่มีไฟล์'), 'สถานะโครงการ งานเกินกำหนด งานถัดไป'],
+      ['ไฟล์งานซ่อม (Factorium)', 'Excel ส่งออก · นำเข้าด้วย scripts/maintenance_import.py', MN ? dLabel(String(MN.last).slice(0, 10)) : '–', MN ? `${dLabel(String(MN.first).slice(0, 10))} – ${dLabel(String(MN.last).slice(0, 10))}` : '–', MN ? ok('ใช้ได้') : na('ไม่มีไฟล์'), 'งานซ่อมค้าง แยกระบบผลิต/IT/สำนักงาน/ยานพาหนะ · SLA'],
+    ];
+    const K = [
+      ['Revenue · ยอดออกบิล', 'WMS ใบแจ้งหนี้ (ไม่รวม VAT)', ok('ใช้ได้'), 'Executive · การขาย · กลยุทธ์'],
+      ['Profit · กำไรตามบัญชี', 'TRCLOUD งบที่ปิดงวด', wt('รอยืนยัน'), 'รอฝ่ายบัญชีปิดงวดและยืนยันรายได้/ต้นทุนช่วงเดียวกัน'],
+      ['Cash · เงินสด', 'TRCLOUD ยอดธนาคาร', na('รอข้อมูล'), 'ยอดธนาคารใน TRCLOUD เป็น 0 และยังไม่นำเข้ารายการเดินบัญชี · แสดงรับชำระตามใบเสร็จ WMS แยกต่างหาก'],
+      ['Pipeline · Lead / Opportunity / Win Rate', 'ยังไม่มีระบบ', na('รอข้อมูล'), 'ใช้คำร้องขอใช้น้ำที่ยังเปิด และอัตราคำร้องติดตั้งสำเร็จ เป็นข้อมูลประกอบ'],
+      ['Sales Cycle', 'WMS คำร้อง → วันเริ่มใช้น้ำ', ok('ใช้ได้'), 'ข้อมูลคำร้องเริ่ม มี.ค. 2569'],
+      ['New Customers · ลูกค้าใหม่', 'WMS ใบแจ้งหนี้ค่าน้ำใบแรก', ok('ใช้ได้'), 'ไม่นับลูกค้าสัญญาที่ย้ายเข้าระบบ'],
+      ['รายได้เฉลี่ยต่อบัญชี', 'WMS ใบแจ้งหนี้ค่าน้ำ ÷ บัญชีที่ออกบิล', ok('ใช้ได้'), 'ใช้แทน CLV จนกว่าจะมีอายุลูกค้าและกำไรต่อบัญชี'],
+      ['ต้นทุนระบบผลิต', 'TRCLOUD GL 7 บัญชี', wt('รอยืนยัน'), 'ม.ค.–ก.ค. มาจาก JV ปรับปรุงวันที่ 3 ก.ย. · ไม่มีข้อมูลปี 2568 ให้เทียบ'],
+      ['โครงการ / งานเกินกำหนด', 'ClickUp', ok('ใช้ได้'), 'ขึ้นกับการอัปเดตสถานะใน ClickUp'],
+      ['งานซ่อมค้าง', 'ไฟล์ Factorium', ok('ใช้ได้'), 'ตามรอบไฟล์ที่ส่งออก ไม่ใช่ข้อมูลสด'],
+    ];
+    el.innerHTML = `
+      ${srcLine('ทุกหน้ามาจากข้อมูลชุดคงที่ที่เข้ารหัสในเว็บ · ไม่มีการเขียนกลับระบบต้นทาง · ยอด WMS และยอดบัญชี TRCLOUD แสดงแยกกัน ไม่นำมารวมกัน')}
+      <div class="grid">
+        ${card('c-ds-src', 'แหล่งข้อมูล', 'วันที่ดึง ช่วงข้อมูล และสิ่งที่ใช้แต่ละแหล่ง', '', table([{ h: 'แหล่ง', f: (r) => `<b>${esc(r[0])}</b><br><span class="small">${esc(r[1])}</span>` }, { h: 'ดึงข้อมูล', nw: 1, k: 2 }, { h: 'ช่วงข้อมูล', nw: 1, k: 3 }, { h: 'สถานะ', nw: 1, f: (r) => r[4] }, { h: 'ใช้ทำอะไร', f: (r) => esc(r[5]) }], src), { csv: 1 })}
+        ${card('c-ds-kpi', 'สถานะ KPI สำหรับผู้บริหาร', 'ใช้ได้ = มาจากข้อมูลจริงและตรวจแล้ว · รอยืนยัน = มีข้อมูลแต่ต้องให้เจ้าของข้อมูลยืนยัน · รอข้อมูล = ยังไม่มีแหล่ง', '', table([{ h: 'KPI', f: (r) => `<b>${esc(r[0])}</b>` }, { h: 'แหล่งหลัก', k: 1 }, { h: 'สถานะ', nw: 1, f: (r) => r[2] }, { h: 'หมายเหตุ', f: (r) => esc(r[3]) }], K), { csv: 1 })}
+      </div>`;
+  }
+
   // ---------- pages ----------
   // ซ่อนหน้า ภาพรวมผู้บริหาร (pOverview) และ คุณภาพข้อมูล (pQuality) ตามที่ผู้ใช้ขอ — โค้ดยังอยู่ เปิดกลับได้โดยเพิ่มใน PAGES และเมนู
-  const PAGES = { snapshot: pSnapshot, revenue: pRevenue, sales: pSales, usage: pUsage, customers: pCustomers, collections: pCollections, meter: pMeter };
+  const PAGES = { snapshot: pSnapshot, revenue: pRevenue, sales: pSales, usage: pUsage, customers: pCustomers, collections: pCollections, meter: pMeter, finance: pFinance, projects: pProjects, maint: pMaint, salesov: pSalesOv, growth: pGrowth, datasrc: pDataSrc };
   // หัวหน้าแต่ละหน้า: ชื่อ + ตัวกรองที่มีผลกับหน้านั้นเท่านั้น
   const PAGE_META = {
-    snapshot: { t: 'Executive Snapshot', f: ['to', 'br', 'ty'], toL: 'เดือนรายงาน' },
-    revenue: { t: 'รายได้ตามกลุ่มลูกค้า', f: ['from', 'to', 'br', 'ty', 'moo'] },
-    usage: { t: 'การใช้น้ำเทียบปีก่อน', f: ['from', 'to', 'br', 'ty'] },
-    sales: { t: 'รายได้และการใช้น้ำ', f: ['from', 'to', 'br', 'ty', 'moo'] },
-    customers: { t: 'ลูกค้า', f: ['from', 'to', 'br', 'ty'] },
-    collections: { t: 'การจัดเก็บและลูกหนี้', f: ['from', 'to', 'br', 'ty', 'asof'] },
-    meter: { t: 'การจดมาตรและออกใบแจ้งหนี้', f: [] },
+    snapshot: { t: 'Executive Snapshot', f: ['to', 'br', 'ty'], toL: 'เดือนรายงาน', sub: 'Revenue · Profit · Cash · Pipeline · New Customers พร้อมแหล่งข้อมูล ช่วงเวลา และวันอัปเดตของแต่ละตัว' },
+    salesov: { t: 'ภาพรวมการขาย', f: ['from', 'to', 'br', 'ty'], sub: 'Sales Cycle คำร้องขอใช้น้ำ ลูกค้าใหม่ และรายได้เฉลี่ยต่อบัญชี · Lead/Opportunity/Win Rate แสดงสถานะรอข้อมูล' },
+    revenue: { t: 'รายได้ตามกลุ่มลูกค้า', f: ['from', 'to', 'br', 'ty', 'moo'], sub: 'รายได้ตามใบแจ้งหนี้ WMS แยกกลุ่มลูกค้า สาขา และหมู่' },
+    usage: { t: 'การใช้น้ำเทียบปีก่อน', f: ['from', 'to', 'br', 'ty'], sub: 'ปริมาณน้ำของลูกค้าเดิมเทียบช่วงเดียวกันปีก่อน · ผู้ใช้น้ำที่ลดลง' },
+    sales: { t: 'รายได้และการใช้น้ำ', f: ['from', 'to', 'br', 'ty', 'moo'], sub: 'รายได้ ปริมาณน้ำ และราคาเฉลี่ยรายเดือนจาก WMS' },
+    customers: { t: 'ลูกค้า', f: ['from', 'to', 'br', 'ty'], sub: 'ลูกค้าที่ออกบิล ลูกค้าใหม่ คำร้องติดตั้ง และการคงอยู่ของลูกค้า' },
+    collections: { t: 'การจัดเก็บและลูกหนี้', f: ['from', 'to', 'br', 'ty', 'asof'], sub: 'รับชำระตามใบเสร็จ WMS และอายุลูกหนี้ ณ วันอ้างอิง' },
+    meter: { t: 'การจดมาตรและออกใบแจ้งหนี้', f: [], sub: 'ความคืบหน้าการจดมาตรรอบล่าสุด และการติดตามเอกสาร BL/IV ใน TRCLOUD' },
+    finance: { t: 'การเงิน', f: [], sub: 'ยอดออกบิลตาม WMS และต้นทุนตามบัญชี TRCLOUD แสดงแยกกัน ไม่นำมารวมกัน' },
+    projects: { t: 'โครงการ', f: [], sub: 'สถานะโครงการ งานเกินกำหนด และงานถัดไปจาก ClickUp Space HEA' },
+    growth: { t: 'ภาพรวมการเติบโต', f: ['from', 'to', 'br', 'ty'], sub: 'เทียบช่วงที่เลือกกับช่วงเดียวกันปีก่อน ตามบริการ กลุ่มลูกค้า และพื้นที่ · ไม่คำนวณ CLV' },
+    maint: { t: 'ซ่อมบำรุง', f: [], sub: 'งานซ่อมจากไฟล์ Factorium แยกระบบผลิต IT สำนักงาน และยานพาหนะ' },
+    datasrc: { t: 'แหล่งข้อมูลและสถานะ KPI', f: [], sub: 'แต่ละตัวเลขมาจากไหน ดึงเมื่อไร และตัวไหนยังรอยืนยัน' },
   };
   // บรรทัดเล็กใต้ชื่อหน้า: SNAPSHOT · <ขอบเขตของหน้า> · ข้อมูล ณ … · ที่มาของข้อมูล
   const setScope = (t) => { const e = $('page-scope'); if (e) e.textContent = t ? ' ' + t + ' ·' : ''; };
@@ -664,8 +1111,9 @@
     document.querySelector('.pf-links').hidden = !meta.f.length;
     $('head-tools').innerHTML = '';
     setTitle(meta.t);
+    $('page-sub').textContent = meta.sub || '';
     renderFresh();
-    document.querySelectorAll('#nav a').forEach((a) => { if (a.dataset.page === S.page) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+    renderNav();
     const el = $('page');
     try { PAGES[S.page](el); } catch (e) { console.error(e); el.innerHTML = `<div class="card state err">แสดงผลไม่สำเร็จ: ${esc(e.message)}</div>`; }
     wireCardTools(el);
@@ -1211,6 +1659,7 @@
     const cmpS = (a, b) => cmpRow('', a, b)[1];
     const cmpC = (a, b) => cmpRow('', a, b)[2];
     el.innerHTML = `
+      ${ceoCards(M)}
       <div class="snap">
       <section class="snap-page">
         ${ph(`Executive Snapshot · รายได้ประจำเดือน ${mLong(M)}`, 'บริษัท ไฮโดรเอ็นเตอร์ไพร์ส แอนด์ อะควอดีซายน์ จำกัด · ' + scope, `ข้อมูล ณ ${dLabel(S.asof)}<br>${S.cfg.mode === 'live' ? 'LIVE' : 'SNAPSHOT'} · ดึง ${S.fetched ? dLabel(S.fetched.slice(0, 10)) : '–'}`)}
@@ -1350,7 +1799,7 @@
       if (h.units && okBr('ไม้ขาว')) A.push({ p: 3, t: 'อัตราน้ำ อบต.ไม้ขาว (หอถังสูง) ต่ำสุดทุกกลุ่ม', what: `ใช้น้ำ ${int(h.units)} ลบ.ม. ที่ ${nf2.format(h.wnet / h.units)} บาท/ลบ.ม. — อาจใช้เป็นประเด็นเมื่อเจรจา/ทบทวนเงื่อนไขสัญญา`,
         imp: `ทุก +1 บาท/ลบ.ม. ≈ +${mb(h.units / mo * 12)} ล้านบาท/ปี`, own: 'ผู้บริหาร + กฎหมาย/สัญญา', kpi: 'บาท/ลบ.ม. หอถัง', pg: 'revenue' }); }
     // 6) ข้อมูล
-    A.push({ p: 3, t: 'ช่องโหว่ข้อมูลใน WMS ที่ควรปิด', what: 'แนวทาง: นำเข้าบิลลูกค้ารายใหญ่จาก Pay2Head 389 ใบ, ยกเลิกบิล/ทะเบียนทดสอบ, ให้ใบเสร็จบันทึกวันที่รับชำระ และทะเบียนที่สถานะไม่ตรงกับบิล', imp: 'ตัวเลขผู้บริหารไม่ต้องพึ่งไฟล์เสริม', own: 'IT + ผู้พัฒนา WMS', kpi: 'รายการในหน้าคุณภาพข้อมูล', pg: 'quality' });
+    A.push({ p: 3, t: 'ช่องโหว่ข้อมูลใน WMS ที่ควรปิด', what: 'แนวทาง: นำเข้าบิลลูกค้ารายใหญ่จาก Pay2Head 389 ใบ, ยกเลิกบิล/ทะเบียนทดสอบ, ให้ใบเสร็จบันทึกวันที่รับชำระ และทะเบียนที่สถานะไม่ตรงกับบิล', imp: 'ตัวเลขผู้บริหารไม่ต้องพึ่งไฟล์เสริม', own: 'IT + ผู้พัฒนา WMS', kpi: 'รายการในหน้าสถานะข้อมูล', pg: 'datasrc' });
     return A.sort((a, b) => a.p - b.p);
   }
   function ceoBlock() {

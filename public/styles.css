@@ -737,3 +737,69 @@ td.area{max-width:260px;width:260px}
 @media (max-width: 9999px) and (max-width: 1px) { .hdr .seg button { padding: 0 10px; } .hdr .seg button span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; } }
 @media (max-width: 1100px) { .tabs a { min-height: 36px; padding: 0 9px; font-size: 13.5px; } }
 @media (prefers-reduced-motion: reduce) { .hdr .seg button, .tabs a, .seg2 button { transition: none; } }
+
+/* ======================================================================
+   หน้าโจทย์ CEO: การ์ดสรุป 5 ตัว · การเงิน · โครงการ · ซ่อมบำรุง (21/11/69)
+   ====================================================================== */
+/* แถบเมนู 10 หน้าอยู่บรรทัดที่สองของหัวเว็บ (แบบ PSG) */
+.hdr-break { flex-basis: 100%; height: 0; order: 2; }
+.hdr-in > .logo { order: 0; }
+.hdr .hdr-user { order: 1; margin-left: auto; }
+.hdr #theme { order: 1; }
+.tabs { order: 3; flex: 0 1 auto; margin: 0 0 2px; overflow-x: auto; scrollbar-width: thin; }
+.tabs a { white-space: nowrap; }
+@media print { .no-print { display: none !important; } }
+
+.ceo { margin-bottom: 18px; }
+.ceo-cards { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+.ceo-card { display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; color: inherit; text-decoration: none; border-top: 3px solid var(--accent, #3C549A); transition: box-shadow .18s ease, transform .18s ease; }
+.ceo-card:hover { box-shadow: 0 4px 14px rgba(20, 30, 60, .12); transform: translateY(-1px); }
+.ceo-card.wait { border-top-color: var(--line-strong); }
+.ceo-l { font-size: 13px; color: var(--text-2); font-weight: 500; }
+.ceo-v { font-size: 26px; font-weight: 600; color: var(--heading); line-height: 1.2; }
+.ceo-v small { font-size: 13px; font-weight: 400; color: var(--text-2); }
+.ceo-c { font-size: 13px; color: var(--fg); }
+.ceo-src { margin-top: auto; padding-top: 6px; font-size: 11.5px; color: var(--text-2); border-top: 1px dashed var(--line); }
+.ceo-ins { margin-top: 12px; padding: 12px 16px; }
+.ceo-ins h3 { margin: 0 0 6px; font-size: 15px; }
+.ceo-ins ol { margin: 0; padding-left: 20px; display: grid; gap: 4px; font-size: 13.5px; }
+.v-wait { color: var(--text-2) !important; font-size: 22px !important; font-weight: 600; }
+.wait-kpi { border-style: dashed; }
+.src-line { margin-top: 14px; font-size: 12px; color: var(--text-2); }
+.big-num { font-size: 28px; font-weight: 600; color: var(--heading); margin: 6px 0; }
+.big-num small { font-size: 14px; font-weight: 400; color: var(--text-2); }
+.pill.info { background: var(--row-sub); color: var(--hea-navy); border-color: var(--line); }
+:root[data-theme="dark"] .pill.info { color: #BFD0F5; }
+.seg2 button small { opacity: .7; margin-left: 2px; }
+@media (max-width: 1200px) { .ceo-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .ceo-cards { grid-template-columns: 1fr 1fr; } }
+@media (prefers-reduced-motion: reduce) { .ceo-card { transition: none; } .ceo-card:hover { transform: none; } }
+.wait-kpi .rows div { display: block; }
+.wait-kpi .rows .k { display: block; }
+.wait-kpi .rows .v { display: block; white-space: normal; text-align: left; font-weight: 400; margin-bottom: 4px; }
+.t td .sym { display: inline-block; max-width: 360px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
+.scroll-box { max-height: 460px; overflow: auto; }
+.scroll-box thead th { position: sticky; top: 0; background: var(--card); z-index: 1; }
+#head-tools .seg2 { flex-wrap: wrap; max-width: 100%; }
+
+/* ======================================================================
+   กลุ่มเมนู 7 กลุ่ม + แถบย่อยแบบ pill (ตามโครงแดชบอร์ดกลุ่ม AE) · 21/11/69
+   ====================================================================== */
+.subbar { background: var(--side-bg); border-top: 1px solid rgba(255, 255, 255, .10); }
+.subbar[hidden] { display: none; }
+.subtabs { max-width: 1600px; margin: 0 auto; padding: 8px 24px 10px; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: thin; }
+.subtabs a { flex: none; min-height: 36px; display: flex; align-items: center; padding: 0 16px; border-radius: 999px; color: #fff; opacity: .82; text-decoration: none; font-size: 14px; white-space: nowrap; border: 1px solid transparent; transition: background-color .18s ease, opacity .18s ease; }
+.subtabs a:hover { opacity: 1; background: rgba(255, 255, 255, .07); }
+.subtabs a[aria-current="page"] { opacity: 1; font-weight: 600; background: rgba(255, 255, 255, .14); border-color: rgba(255, 255, 255, .10); }
+.subtabs a:focus-visible { outline: 2px solid var(--hea-aqua); outline-offset: 1px; }
+:root[data-theme="dark"] .subbar { background: #121C33; border-top-color: var(--line); border-bottom: 1px solid var(--line); }
+:root[data-theme="light"] .subbar { background: #F7F9FC; border-top: 0; border-bottom: 1px solid var(--hdr-line); }
+:root[data-theme="light"] .subtabs a { color: var(--hea-deep-navy); opacity: .85; }
+:root[data-theme="light"] .subtabs a:hover { background: rgba(42, 61, 122, .06); opacity: 1; }
+:root[data-theme="light"] .subtabs a[aria-current="page"] { background: #FFFFFF; border-color: #DCE3EC; box-shadow: 0 1px 2px rgba(20, 30, 60, .08); }
+:root[data-theme="light"] .subtabs a:focus-visible { outline-color: var(--hea-navy); }
+.psub { margin: 2px 0 6px; color: var(--text-2); font-size: 14.5px; line-height: 1.5; max-width: 900px; }
+.ceo-ins ol li + li { margin-top: 4px; }
+@media (max-width: 1100px) { .subtabs { padding: 6px 16px 8px; } .subtabs a { padding: 0 12px; font-size: 13.5px; } }
+@media print { .subbar { display: none; } }
+@media (prefers-reduced-motion: reduce) { .subtabs a { transition: none; } }
