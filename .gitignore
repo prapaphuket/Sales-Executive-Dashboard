@@ -14,3 +14,9 @@ keys/
 docs/validation_results.md
 docs/data_issues.md
 __pycache__/
+# ข้อมูลดิบสำหรับหน้า CEO (ClickUp / GL TRCLOUD / ไฟล์ใบงานซ่อม) — ไม่ขึ้น repo
+data/clickup/
+data/gl/
+data/maintenance/
+data/*.csv
+data/*.xlsx
