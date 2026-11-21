@@ -642,7 +642,7 @@ table.vlines tr.grp td { border-left: 0; }
 .tabs a { padding: 0 11px; font-size: 14px; }
 .hdr .userbar #who { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hdr .seg button { padding: 4px 10px; }
-@media (max-width: 1600px) { .hdr .userbar #who { display: none; } }
+@media (max-width: 640px) { .hdr .userbar #who { display: none; } }
 
 /* ชื่อยาวในตาราง: ตัดด้วย … ชี้เมาส์ดูชื่อเต็ม (title) */
 .trunc{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom;cursor:help}
@@ -803,3 +803,19 @@ td.area{max-width:260px;width:260px}
 @media (max-width: 1100px) { .subtabs { padding: 6px 16px 8px; } .subtabs a { padding: 0 12px; font-size: 13.5px; } }
 @media print { .subbar { display: none; } }
 @media (prefers-reduced-motion: reduce) { .subtabs a { transition: none; } }
+
+/* หัวเว็บแบบ STG/SAM: ธีม → ชื่อผู้ใช้ → ออกจากระบบ (ขวาบน) · เมนูอยู่บรรทัดที่สอง */
+.hdr #theme { order: 1; margin-left: auto; }
+.hdr .hdr-user { order: 2; margin-left: 0; }
+.hdr-break { order: 5; }
+.tabs { order: 6; }
+.hdr .userbar { gap: 14px; font-size: 14px; }
+.hdr .userbar #who { max-width: 240px; }
+.hdr .userbar button { padding: 6px 14px; border-radius: 8px; }
+.hdr .userbar #who { color: #fff; font-weight: 500; }
+.hdr .userbar button { background: transparent; color: #fff; border: 1px solid rgba(255, 255, 255, .55); font: inherit; font-weight: 500; cursor: pointer; }
+.hdr .userbar button:hover { background: rgba(255, 255, 255, .10); border-color: #fff; }
+:root[data-theme="light"] .hdr .userbar #who { color: var(--heading); }
+:root[data-theme="light"] .hdr .userbar button { background: #fff; color: var(--hea-navy); border-color: var(--line-strong); }
+@media (max-width: 640px) { .hdr .userbar button { padding: 4px 10px; } }
+.hdr .userbar { display: flex; } .hdr .userbar[hidden] { display: none; } .hdr .userbar #who { margin-right: 4px; }
