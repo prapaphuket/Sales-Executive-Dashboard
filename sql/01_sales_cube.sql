@@ -1,3 +1,4 @@
+-- สาขาของ BL งานขายที่ไม่ผูกสาขาใน WMS (คุณวิชาญยืนยัน 21/11/69): BL2611040002 = สาคู (1) · BL2605230004, BL2606100002 = ไม้ขาว (2)
 -- 01_sales_cube : ยอดขายสุทธิไม่รวม VAT + หน่วยน้ำ รายเดือน x สาขา x กลุ่มลูกค้า x แหล่งเอกสาร
 -- ฐานเวลา: วันที่ออกเอกสาร (ใบแจ้งหนี้ค่าน้ำ = record_invoices.issue_date, ใบแจ้งหนี้งานขาย = bill_invoice_fees.bill_date, ใบลดหนี้ = credit_notes.issue_date)
 -- $1::date = วันแรกของช่วง (date), $2::date = วันอ้างอิง/วันสุดท้ายของข้อมูล (date)
@@ -22,7 +23,7 @@ w as (
   from inv i left join cw on cw.id = i.customer_water_id
   group by 1, 2, 3),
 l as (
-  select to_char(f.bill_date, 'YYYY-MM') m, f.branch_id,
+  select to_char(f.bill_date, 'YYYY-MM') m, coalesce(f.branch_id, case f.invoice_number when 'BL2611040002' then 1 when 'BL2605230004' then 2 when 'BL2606100002' then 2 end) branch_id,
          case f.customer_water_id when 4 then 'T2.2' when 2438 then 'T3.1' else 'T2.3' end ty, 'L' src,
          count(*) docs, sum(f.subtotal)::numeric wat, 0::numeric svc, 0::numeric disc, null::numeric units, null::numeric free_units, sum(f.vat)::numeric vat_doc
   from vw_dash_bill_invoice_fees f
@@ -31,7 +32,7 @@ l as (
     and not exists (select 1 from record_invoices zd where zd.invoice_number = f.invoice_number and zd.customer_water_id = f.customer_water_id and zd.status <> 'cancelled')
   group by 1, 2, 3),
 f as (
-  select to_char(f.bill_date, 'YYYY-MM') m, f.branch_id, coalesce(cw.ty, '?') ty, 'F' src,
+  select to_char(f.bill_date, 'YYYY-MM') m, coalesce(f.branch_id, case f.invoice_number when 'BL2611040002' then 1 when 'BL2605230004' then 2 when 'BL2606100002' then 2 end) branch_id, coalesce(cw.ty, '?') ty, 'F' src,
          count(*) docs, 0::numeric wat, sum(f.subtotal)::numeric svc, 0::numeric disc, null::numeric units, null::numeric free_units, sum(f.vat)::numeric vat_doc
   from vw_dash_bill_invoice_fees f left join cw on cw.id = f.customer_water_id
   where f.status = 'active' and f.bill_date between $1::date and $2::date

@@ -1,3 +1,4 @@
+-- สาขาของ BL งานขายที่ไม่ผูกสาขาใน WMS (คุณวิชาญยืนยัน 21/11/69): BL2611040002 = สาคู (1) · BL2605230004, BL2606100002 = ไม้ขาว (2)
 -- 13_revenue_groups : รายได้ตามกลุ่มลูกค้า รายเดือน แยกสาขา(ตำบล) x ประเภท x หมู่ — หน้าเว็บรวมตามช่วงเดือนที่เลือก เทียบช่วงเดียวกันปีก่อน
 -- ช่วงข้อมูล = 12 เดือนก่อน $1 ถึงสิ้นเดือนก่อนวันอ้างอิง $2 (ให้ทุกเดือนที่เลือกได้มีปีก่อนไว้เทียบ)
 -- window (ค่าเริ่มต้นของหน้าเว็บ) = ม.ค. ถึงเดือนเต็มล่าสุดของปี เทียบช่วงเดียวกันปีก่อน
@@ -36,7 +37,7 @@ u as (
          case when i.discount_config ->> 'discount_type' = 'free_units' then least(i.water_unit, (i.discount_config ->> 'discount_value')::numeric) else 0 end free
   from inv i
   union all
-  select f.bill_date, f.branch_id, f.customer_water_id, case when f.customer_water_id in (select cw from big) and f.invoice_number not like 'BL%' then 'L' else 'F' end,
+  select f.bill_date, coalesce(f.branch_id, case f.invoice_number when 'BL2611040002' then 1 when 'BL2605230004' then 2 when 'BL2606100002' then 2 end), f.customer_water_id, case when f.customer_water_id in (select cw from big) and f.invoice_number not like 'BL%' then 'L' else 'F' end,
          case when f.customer_water_id in (select cw from big) and f.invoice_number not like 'BL%' then f.subtotal else 0 end::numeric,
          case when f.customer_water_id in (select cw from big) and f.invoice_number not like 'BL%' then 0 else f.subtotal end::numeric, 0::numeric, null::numeric, 0::numeric
   from vw_dash_bill_invoice_fees f, w where f.status = 'active' and (f.bill_date between w.a0 and w.e1) and not exists (select 1 from record_invoices zd where zd.invoice_number = f.invoice_number and zd.customer_water_id = f.customer_water_id and zd.status <> 'cancelled')

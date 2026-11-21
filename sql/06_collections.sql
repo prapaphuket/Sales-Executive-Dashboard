@@ -1,3 +1,5 @@
+-- สาขาของ BL งานขายที่ไม่ผูกสาขาใน WMS (คุณวิชาญยืนยัน 21/11/69): BL2611040002 = สาคู (1) · BL2605230004, BL2606100002 = ไม้ขาว (2)
+-- ใบเสร็จงานขายที่ไม่มีสาขา ใช้สาขาของใบแจ้งหนี้ที่ผูกอยู่
 -- 06_collections : ยอดรับชำระตามใบเสร็จ ตามวันที่รับชำระ (payment_date ถ้ามี ไม่มีใช้วันที่ใบเสร็จ) รายเดือน x สาขา x ประเภท x ช่องทาง
 -- kind: water = ใบเสร็จค่าน้ำ (record_bills) | water_legacy = ใบเสร็จค่าน้ำลูกค้ารายใหญ่ระบบเดิม (bill_fees) | fee = งานขาย/บริการ (bill_fees) | bond = เงินประกัน (bill_payment_bonds)
 -- สาขาของใบเสร็จค่าน้ำใช้สาขาของใบแจ้งหนี้ (ใบเสร็จระบบเดิมจำนวนมากบันทึกสาขาเป็นนาเตย ทั้งที่ใบแจ้งหนี้เป็นไม้ขาว)
@@ -14,10 +16,10 @@ r0 as (
   from record_bills rb left join record_invoices i on i.id = rb.record_invoice_id
   where rb.status = 'paymented'
   union all
-  select coalesce(payment_date, bill_date), branch_id,
-         case when customer_water_id in (select cw from big) and coalesce(bill_number, '') not like 'IV%' then 'water_legacy' else 'fee' end,
-         payment_type, total::numeric, coalesce(withhold_tax_amount, 0)
-  from bill_fees where status = 'active'
+  select coalesce(bf.payment_date, bf.bill_date), coalesce(bf.branch_id, fi.branch_id, case fi.invoice_number when 'BL2611040002' then 1 when 'BL2605230004' then 2 when 'BL2606100002' then 2 end),
+         case when bf.customer_water_id in (select cw from big) and coalesce(bf.bill_number, '') not like 'IV%' then 'water_legacy' else 'fee' end,
+         bf.payment_type, bf.total::numeric, coalesce(bf.withhold_tax_amount, 0)
+  from bill_fees bf left join bill_invoice_fees fi on fi.id = bf.bill_invoice_fee_id where bf.status = 'active'
   union all
   select coalesce(payment_date, bill_date), branch_id, 'bond', payment_type, total, 0::numeric  -- view เงินประกันไม่มีคอลัมน์ภาษีหัก ณ ที่จ่าย
   from vw_dash_bill_payment_bonds where coalesce(status, '') <> 'cancelled'),

@@ -115,6 +115,13 @@
     const BRMAP = { 'นาเตย': 'ไม้ขาว' };
     const nb = (arr) => arr.forEach((r) => { if (BRMAP[r.br]) r.br = BRMAP[r.br]; });
     [S.sales, S.mooM, S.cust, S.newRev, S.custStatus, S.coll, S.cohort, S.ar, S.top, S.decl, S.debt, S.rev, S.revCust, S.cm].forEach(nb);
+    // 1b) หล่อยูง = สาขาที่ปิดไปหลายปีแล้ว → ไม่แสดงในทุกหน้า (ผู้ใช้ยืนยัน 21/11/69) · ยอดที่ตัดออกสรุปไว้ในหน้าสถานะข้อมูล
+    const DROP_BR = new Set(['หล่อยูง']);
+    S.dropped = { sales: 0, rev: 0, coll: 0, n: 0 };
+    S.dropped.sales = sum(S.sales.filter((r) => DROP_BR.has(r.br)), (r) => r.net);
+    S.dropped.rev = sum(S.rev.filter((r) => DROP_BR.has(r.br)), (r) => r.net);
+    S.dropped.coll = sum(S.coll.filter((r) => DROP_BR.has(r.br)), (r) => r.amt);
+    ['sales', 'mooM', 'cust', 'newRev', 'custStatus', 'coll', 'cohort', 'ar', 'top', 'decl', 'debt', 'rev', 'revCust', 'cm'].forEach((k) => { if (Array.isArray(S[k])) S[k] = S[k].filter((r) => !DROP_BR.has(r.br)); });
     if (d.usage_compare) { d.usage_compare.status.forEach((r) => { if (BRMAP[r[0]]) r[0] = BRMAP[r[0]]; }); d.usage_compare.monthly.forEach((r) => { if (BRMAP[r[1]]) r[1] = BRMAP[r[1]]; }); }
     // 2) หน่วยน้ำ (และบิลที่ขาด) ของลูกค้ารายใหญ่ระบบเดิม จากไฟล์ตรวจเทียบ Pay2Head — ใช้ชั่วคราวจนกว่าจะนำเข้า WMS
     S.leg = d.legacy_units ? rowsOf(d.legacy_units) : [];
@@ -1072,11 +1079,19 @@
       ['โครงการ / งานเกินกำหนด', 'ClickUp', ok('ใช้ได้'), 'ขึ้นกับการอัปเดตสถานะใน ClickUp'],
       ['งานซ่อมค้าง', 'ไฟล์ Factorium', ok('ใช้ได้'), 'ตามรอบไฟล์ที่ส่งออก ไม่ใช่ข้อมูลสด'],
     ];
+    const unk = S.sales.filter((r) => r.br === 'ไม่ระบุ'), D = S.dropped || {};
+    const brNote = [
+      ['สาขาหล่อยูง (ปิดไปหลายปีแล้ว)', 'ไม่แสดงในทุกหน้า', `รายได้ในชุดข้อมูลหลัก ${baht(D.sales)} บาท · รายได้ย้อนหลังหน้า “รายได้ตามกลุ่มลูกค้า” ${baht(D.rev)} บาท · รับชำระ ${baht(D.coll)} บาท`],
+      ['สาขานาเตย', 'รวมเป็นสาขาไม้ขาว', 'นาเตยเป็นชื่อสาขาไม้ขาวในระบบเดิม'],
+      ['BL งานขายที่ไม่ผูกสาขาใน WMS', 'กำหนดสาขาใน SQL ของ dashboard', 'BL2611040002 = สาคู · BL2605230004, BL2606100002 = ไม้ขาว (ยืนยัน 21 พ.ย. 69) · ใบเสร็จงานขายที่ไม่มีสาขาใช้สาขาของใบแจ้งหนี้'],
+      ...(unk.length ? [['สาขา “ไม่ระบุ” ที่ยังเหลือ', 'แสดงตามจริง รอตรวจใน WMS', `${int(sum(unk, (r) => r.docs))} ใบ ${baht(sum(unk, (r) => r.net))} บาท (ไม่รวม VAT)`]] : []),
+    ];
     el.innerHTML = `
       ${srcLine('ทุกหน้ามาจากข้อมูลชุดคงที่ที่เข้ารหัสในเว็บ · ไม่มีการเขียนกลับระบบต้นทาง · ยอด WMS และยอดบัญชี TRCLOUD แสดงแยกกัน ไม่นำมารวมกัน')}
       <div class="grid">
         ${card('c-ds-src', 'แหล่งข้อมูล', 'วันที่ดึง ช่วงข้อมูล และสิ่งที่ใช้แต่ละแหล่ง', '', table([{ h: 'แหล่ง', f: (r) => `<b>${esc(r[0])}</b><br><span class="small">${esc(r[1])}</span>` }, { h: 'ดึงข้อมูล', nw: 1, k: 2 }, { h: 'ช่วงข้อมูล', nw: 1, k: 3 }, { h: 'สถานะ', nw: 1, f: (r) => r[4] }, { h: 'ใช้ทำอะไร', f: (r) => esc(r[5]) }], src), { csv: 1 })}
         ${card('c-ds-kpi', 'สถานะ KPI สำหรับผู้บริหาร', 'ใช้ได้ = มาจากข้อมูลจริงและตรวจแล้ว · รอยืนยัน = มีข้อมูลแต่ต้องให้เจ้าของข้อมูลยืนยัน · รอข้อมูล = ยังไม่มีแหล่ง', '', table([{ h: 'KPI', f: (r) => `<b>${esc(r[0])}</b>` }, { h: 'แหล่งหลัก', k: 1 }, { h: 'สถานะ', nw: 1, f: (r) => r[2] }, { h: 'หมายเหตุ', f: (r) => esc(r[3]) }], K), { csv: 1 })}
+        ${card('c-ds-br', 'การจัดการสาขา', 'ปัจจุบันเปิดให้บริการ 2 สาขา: ไม้ขาว และ สาคู', '', table([{ h: 'รายการ', f: (r) => `<b>${esc(r[0])}</b>` }, { h: 'ใน dashboard', nw: 1, k: 1 }, { h: 'รายละเอียด', f: (r) => esc(r[2]) }], brNote), { csv: 1 })}
       </div>`;
   }
 
