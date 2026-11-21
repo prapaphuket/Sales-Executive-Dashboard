@@ -992,7 +992,7 @@
     el.innerHTML = `
       <h2 class="sec-title">ตัวชี้วัดที่ข้อมูลรองรับ · ${esc(span)}</h2>${real}
       <h2 class="sec-title">ตัวชี้วัดการขายที่ยังไม่มีแหล่งข้อมูล</h2>${wait}
-      <div class="grid g2">
+      <div class="grid g2" style="margin-top:16px">
         ${card('c-so-done', 'ติดตั้งใหม่และระยะเวลาเฉลี่ยรายเดือน', 'คำร้องที่เริ่มใช้น้ำ (นับตามเดือนที่เริ่มใช้น้ำ) · ระยะเวลา = วันที่ยื่นคำร้องถึงวันเริ่มใช้น้ำ', '', table([{ h: 'เดือน', f: (r) => mLabel(r.m), v: (r) => r.m }, { h: 'ติดตั้ง (ราย)', n: 1, f: (r) => barCell(int(r.n), r.n, Math.max(...dn.map((x) => x.n)), 'var(--accent)'), v: (r) => r.n }, { h: 'เฉลี่ย (วัน)', n: 1, f: (r) => `<span class="${r.d > 60 ? 'neg' : r.d <= 30 ? 'pos' : ''}">${int(r.d)}</span>`, v: (r) => r.d }], dn.slice().reverse(), ['รวม', int(sum(dn, (x) => x.n)), '']), { csv: 1 })}
         ${card('c-so-open', 'คำร้องที่ยังเปิด แยกประเภทผู้ขอ', 'ณ วันดึงข้อมูล · ตัวกรองสาขามีผล · อายุ = วันนับจากยื่นคำร้อง', 'สาขา', table([{ h: 'ประเภทผู้ขอ', f: (r) => esc(PIPE_KN[r.k] || r.k) }, { h: 'ราย', n: 1, f: (r) => barCell(int(r.n), r.n, Math.max(...kRows.map((x) => x.n)), 'var(--accent)'), v: (r) => r.n }, { h: 'อายุเฉลี่ย (วัน)', n: 1, f: (r) => `<span class="${r.age / r.n > 60 ? 'neg' : ''}">${int(r.age / r.n)}</span>`, v: (r) => r.age / r.n }, { h: 'เกิน 60 วัน', n: 1, f: (r) => (r.over60 ? `<span class="pill down">${int(r.over60)}</span>` : '<span class="muted">0</span>'), v: (r) => r.over60 }], kRows, ['รวม', int(sum(kRows, (r) => r.n)), '', int(sum(kRows, (r) => r.over60))]) + `<div class="small" style="margin-top:8px">${Object.entries(STN).map(([k, t]) => `${t} ${int(sum(open.filter((r) => r.status === k), (r) => r.n))} ราย`).join(' · ')}</div>`, { csv: 1 })}
       </div>`;

@@ -836,3 +836,20 @@ td.area{max-width:260px;width:260px}
 .kpi .rows .k { min-width: 0; }
 .kpi .label { line-height: 1.4; }
 .pf-links[hidden] { display: none !important; }
+/* การ์ด KPI ในแถวเดียวกันสูงเท่ากัน และเส้นสีด้านบนไม่ดันเนื้อหาให้เหลื่อมกัน */
+.kpis, .grid.g2:has(> .kpi), .grid.g3:has(> .kpi), .grid.g4:has(> .kpi) { align-items: stretch; }
+.kpis > .kpi, .grid > .kpi { height: 100%; }
+.kpi.accent, .kpi.bad, .kpi.target { border-top-width: 1px; }
+.kpi.accent { box-shadow: inset 0 3px 0 var(--accent); }
+.kpi.bad { box-shadow: inset 0 3px 0 var(--status-bad); }
+/* การ์ดในแถวเดียวกัน (g2/g3) สูงเท่ากัน · คอลัมน์ซ้อนการ์ด: ใบสุดท้ายยืดให้เต็มความสูงของแถว */
+.grid.g2, .grid.g3 { align-items: stretch; }
+.stack { display: flex; flex-direction: column; gap: 16px; }
+.stack > .card:last-child { flex: 1 1 auto; }
+/* การ์ดที่มีกรอบเลื่อนในแถวสองคอลัมน์: กรอบเลื่อนยืดให้การ์ดสูงเท่าคอลัมน์ข้าง ๆ */
+.grid.g2 > .card:has(> .scroll-box), .grid.g2 > .card:has(.scroll-box) { display: flex; flex-direction: column; }
+.grid.g2 > .card .scroll-box { flex: 1 1 0; max-height: none; min-height: 260px; }
+/* การ์ดที่ถูกยืดในแถวเดียวกัน: ตารางขยายแถวให้เต็มการ์ด ไม่เหลือที่ว่างด้านล่าง */
+.grid.g2 > .card, .grid.g3 > .card, .stack > .card { display: flex; flex-direction: column; }
+.grid.g2 > .card > .tbl-wrap:last-of-type, .grid.g3 > .card > .tbl-wrap:last-of-type, .stack > .card > .tbl-wrap:last-of-type { flex: 1 1 auto; }
+.grid.g2 > .card > .tbl-wrap:last-of-type > table, .grid.g3 > .card > .tbl-wrap:last-of-type > table, .stack > .card > .tbl-wrap:last-of-type > table { height: 100%; }
