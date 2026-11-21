@@ -1,6 +1,7 @@
 -- 14_usage_compare : การใช้น้ำ (ลบ.ม.) 4 เดือนเต็มล่าสุด เทียบช่วงเดียวกันปีก่อน รายผู้ใช้น้ำ (ลูกค้าทั่วไป ไม่รวม กปภ./ทอท./หอถัง อบต.)
 -- + ปริมาณน้ำรายเดือนของลูกค้าเดิม (มีบิลก่อนปีนี้) + ตรวจทะเบียนเทียบการออกบิล
 -- $2::date = วันอ้างอิง ($1 รับไว้ให้รูปแบบเดียวกับไฟล์อื่น)
+-- ใบลดหนี้ ทอท. CN2608210003/CN2608210004 ถูกยกเลิกใน WMS 12/11/69 (รอบัญชียืนยัน) → ใช้สถานะก่อนยกเลิก (นับเป็นใบลดหนี้ที่ใช้งาน) ตามที่คุณวิชาญตัดสิน 21/11/69
 with p as (select (date_trunc('month', $2::date) - interval '1 day')::date e1, $1::date dummy),
 w as (select (date_trunc('month', e1) - interval '3 months')::date s1, e1, (date_trunc('month', e1) - interval '15 months')::date s0, (e1 - interval '1 year')::date e0,
              date_trunc('year', e1)::date ys, (date_trunc('year', e1) - interval '1 year')::date ys0 from p),
@@ -9,7 +10,7 @@ cw as (select c.id, c.registration_number reg, c.status, c.personal_type, c.bran
 gen as (select * from cw where coalesce(ty, '?') not in ('T2.2', 'T3.1')),   -- หอถัง อบต. (T2.3) นับเป็นลูกค้าทั่วไป (11/11/69)
 first_bill as (select customer_water_id cw, min(issue_date) fb, max(issue_date) lb from record_invoices where status <> 'cancelled' group by 1),
 inv as (select distinct on (i.invoice_number, i.customer_water_id, i.issue_date, i.total, i.water_unit) i.*
-        from record_invoices i, w where i.status <> 'cancelled' and not exists (select 1 from vw_dash_credit_notes zr where zr.record_invoice_id = i.id and coalesce(zr.status, '') <> 'cancelled' and zr.total >= i.total - 0.01) and i.issue_date between w.ys0 and w.e1
+        from record_invoices i, w where i.status <> 'cancelled' and not exists (select 1 from vw_dash_credit_notes zr where zr.record_invoice_id = i.id and (coalesce(zr.status, '') <> 'cancelled' or zr.credit_note_number in ('CN2608210003', 'CN2608210004')) and zr.total >= i.total - 0.01) and i.issue_date between w.ys0 and w.e1
         order by i.invoice_number, i.customer_water_id, i.issue_date, i.total, i.water_unit, i.id),
 q as (select g.id, g.reg, g.branch_id, g.ty, g.status, g.personal_type,
              coalesce(sum(i.water_unit) filter (where i.issue_date between w.s1 and w.e1), 0) q1,

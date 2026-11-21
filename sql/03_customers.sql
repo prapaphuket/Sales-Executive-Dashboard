@@ -1,4 +1,5 @@
 -- 03_customers : ลูกค้าที่มีบิลค่าน้ำในเดือน, ลูกค้าเริ่มมีบิลครั้งแรก (ลูกค้าใหม่ตามการเรียกเก็บ), สถานะทะเบียนปัจจุบัน
+-- ใบลดหนี้ ทอท. CN2608210003/CN2608210004 ถูกยกเลิกใน WMS 12/11/69 (รอบัญชียืนยัน) → ใช้สถานะก่อนยกเลิก (นับเป็นใบลดหนี้ที่ใช้งาน) ตามที่คุณวิชาญตัดสิน 21/11/69
 with cw as (select c.id, c.branch_id, c.status, split_part(t.name, ' - ', 1) ty from vw_dash_customer_waters c left join customer_water_types t on t.id = case when c.id = 1363 then 11 else c.type_id end),
 -- ใบแรก = ใบแจ้งหนี้ค่าน้ำใบแรก · ไม่นับทะเบียนที่ไม่เคยมีหน่วยน้ำเลยและไม่ได้อยู่ในสถานะใช้งาน
 -- (เช่นทะเบียนเก่าที่ออกบิลหน่วย 0 ครั้งเดียวแล้วงดจ่ายน้ำ) · ลูกค้าที่ติดตั้งแล้วแต่ยังไม่ใช้น้ำ (บิลหน่วย 0 + ใช้งาน) ยังนับเป็นลูกค้าใหม่
@@ -18,7 +19,7 @@ newreg as (select to_char(c.created_at, 'YYYY-MM') m, count(*) n from vw_dash_cu
 -- ไม่นับใบแจ้งหนี้ที่ถูกลดหนี้เต็มจำนวน (เหมือน sales_cube)
 ninv as (select distinct on (i.invoice_number, i.customer_water_id, i.issue_date, i.total, i.water_unit) i.*
   from record_invoices i join firstbill fb on fb.customer_water_id = i.customer_water_id
-  where i.status <> 'cancelled' and not exists (select 1 from vw_dash_credit_notes zr where zr.record_invoice_id = i.id and coalesce(zr.status, '') <> 'cancelled' and zr.total >= i.total - 0.01)
+  where i.status <> 'cancelled' and not exists (select 1 from vw_dash_credit_notes zr where zr.record_invoice_id = i.id and (coalesce(zr.status, '') <> 'cancelled' or zr.credit_note_number in ('CN2608210003', 'CN2608210004')) and zr.total >= i.total - 0.01)
     and fb.d1 between $1::date and $2::date and i.issue_date between $1::date and $2::date
   order by i.invoice_number, i.customer_water_id, i.issue_date, i.total, i.water_unit, i.id),
 nu as (

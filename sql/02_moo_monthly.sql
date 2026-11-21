@@ -4,6 +4,7 @@
 --       ใช้เฉพาะที่อยู่ในตำบลไม้ขาว/สาคู หรือไม่ระบุตำบล นอกนั้น = ไม่ระบุหมู่ · สาขา = สาขาของใบแจ้งหนี้
 -- หมู่ (ปรับ 11/11/69): ใช้หมู่ + ตำบลในทะเบียน customer_waters (moo, sub_district = ที่ตั้งมาตร) ก่อน · ถ้าตำบลในทะเบียนไม่ใช่ไม้ขาว/สาคู (กรอกที่อยู่สำนักงาน) ใช้ที่อยู่ใบแจ้งหนี้ แล้วจึงชื่อพื้นที่จดมาตร
 --       ถ้าทะเบียนไม่ระบุหรืออยู่นอกตำบลไม้ขาว/สาคู จึงอ่านจากที่อยู่ในใบแจ้งหนี้ล่าสุดเหมือนเดิม
+-- ใบลดหนี้ ทอท. CN2608210003/CN2608210004 ถูกยกเลิกใน WMS 12/11/69 (รอบัญชียืนยัน) → ใช้สถานะก่อนยกเลิก (นับเป็นใบลดหนี้ที่ใช้งาน) ตามที่คุณวิชาญตัดสิน 21/11/69
 with addr as (select distinct on (customer_water_id) customer_water_id cw, customer_address a from record_invoices
          where status <> 'cancelled' and customer_water_id is not null order by customer_water_id, issue_date desc, id desc),
 cw as (
@@ -23,7 +24,7 @@ cw as (
   left join lateral (select substring(x.a from '(?:หมู่ที่|หมู่|ม\.)\s*(\d{1,2})') moo, substring(x.a from '(?:ตำบล|ต\.)\s*([ก-๙]+)') tb from addr x where x.cw = c.id) m on true),
 inv as (
   select distinct on (i.invoice_number, i.customer_water_id, i.issue_date, i.total, i.water_unit) i.*
-  from record_invoices i where i.status <> 'cancelled' and not exists (select 1 from vw_dash_credit_notes zr where zr.record_invoice_id = i.id and coalesce(zr.status, '') <> 'cancelled' and zr.total >= i.total - 0.01) and i.issue_date between $1::date and $2::date
+  from record_invoices i where i.status <> 'cancelled' and not exists (select 1 from vw_dash_credit_notes zr where zr.record_invoice_id = i.id and (coalesce(zr.status, '') <> 'cancelled' or zr.credit_note_number in ('CN2608210003', 'CN2608210004')) and zr.total >= i.total - 0.01) and i.issue_date between $1::date and $2::date
   order by i.invoice_number, i.customer_water_id, i.issue_date, i.total, i.water_unit, i.id),
 x as (
   select to_char(i.issue_date, 'YYYY-MM') m, coalesce(b.name, 'ไม่ระบุ') br, coalesce(cw.ty, '?') ty, coalesce(cw.moo, 'ไม่ระบุหมู่') moo, count(*) docs,

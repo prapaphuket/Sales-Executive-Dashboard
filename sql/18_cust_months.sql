@@ -5,6 +5,7 @@
 -- ประเภท: ตามทะเบียน ยกเว้นบิลระบบเดิม (L) ของ cw 4 = T2.2, 2438 = T3.1, 1363 = T2.3 (เหมือน 13_revenue_groups) · สาขา = สาขาของใบแจ้งหนี้
 -- หมู่: ทะเบียน customer_waters (moo, sub_district) ก่อน แล้วจึงที่อยู่ในใบแจ้งหนี้ล่าสุด (เหมือน 13_revenue_groups)
 -- ชื่อ: ใบแจ้งหนี้ล่าสุด → ถ้ายังไม่เคยมีบิลใช้ customer_waters.name
+-- ใบลดหนี้ ทอท. CN2608210003/CN2608210004 ถูกยกเลิกใน WMS 12/11/69 (รอบัญชียืนยัน) → ใช้สถานะก่อนยกเลิก (นับเป็นใบลดหนี้ที่ใช้งาน) ตามที่คุณวิชาญตัดสิน 21/11/69
 with big as (select unnest(array[4, 2438, 1363]) cw),
 p as (select (date_trunc('month', $2::date) - interval '1 day')::date e1, (date_trunc('month', $1::date) - interval '12 months')::date a0),
 mon as (select to_char(g, 'YYYY-MM') m, row_number() over (order by g) i from p, generate_series(p.a0, p.e1, interval '1 month') g),
@@ -26,7 +27,7 @@ cw as (
   left join meter_reading_areas ar on ar.id = wt.meter_reading_area_id
   left join lateral (select x.nm, substring(x.a from '(?:หมู่ที่|หมู่|ม\.)\s*(\d{1,2})') moo, substring(x.a from '(?:ตำบล|ต\.)\s*([ก-๙]+)') tb from addr x where x.cw = c.id) m on true),
 inv as (select distinct on (i.invoice_number, i.customer_water_id, i.issue_date, i.total, i.water_unit) i.*
-        from record_invoices i, p where i.status <> 'cancelled' and not exists (select 1 from vw_dash_credit_notes zr where zr.record_invoice_id = i.id and coalesce(zr.status, '') <> 'cancelled' and zr.total >= i.total - 0.01) and i.issue_date between p.a0 and p.e1 and i.customer_water_id is not null
+        from record_invoices i, p where i.status <> 'cancelled' and not exists (select 1 from vw_dash_credit_notes zr where zr.record_invoice_id = i.id and (coalesce(zr.status, '') <> 'cancelled' or zr.credit_note_number in ('CN2608210003', 'CN2608210004')) and zr.total >= i.total - 0.01) and i.issue_date between p.a0 and p.e1 and i.customer_water_id is not null
         order by i.invoice_number, i.customer_water_id, i.issue_date, i.total, i.water_unit, i.id),
 u as (
   select i.customer_water_id cwid, i.branch_id, null::text tyo, to_char(i.issue_date, 'YYYY-MM') m, i.water_unit q, false l from inv i

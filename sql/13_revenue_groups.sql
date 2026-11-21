@@ -5,6 +5,7 @@
 -- src: W = ใบแจ้งหนี้ค่าน้ำ | L = ค่าน้ำลูกค้ารายใหญ่ระบบเดิม (ไม่มีหน่วย) | F = งานขาย/บริการอื่น | C = ใบลดหนี้ (ติดลบ)
 -- หมู่ (ปรับ 11/11/69): ใช้หมู่ + ตำบลในทะเบียน customer_waters (moo, sub_district = ที่ตั้งมาตร) ก่อน · ถ้าตำบลในทะเบียนไม่ใช่ไม้ขาว/สาคู (กรอกที่อยู่สำนักงาน) ใช้ที่อยู่ใบแจ้งหนี้ แล้วจึงชื่อพื้นที่จดมาตร
 --       ถ้าทะเบียนไม่ระบุหรืออยู่นอกตำบลไม้ขาว/สาคู จึงอ่านจากที่อยู่ในใบแจ้งหนี้ล่าสุดเหมือนเดิม
+-- ใบลดหนี้ ทอท. CN2608210003/CN2608210004 ถูกยกเลิกใน WMS 12/11/69 (รอบัญชียืนยัน) → ใช้สถานะก่อนยกเลิก (นับเป็นใบลดหนี้ที่ใช้งาน) ตามที่คุณวิชาญตัดสิน 21/11/69
 with big as (select unnest(array[4, 2438, 1363]) cw),
 p as (select (date_trunc('month', $2::date) - interval '1 day')::date e1, (date_trunc('month', $1::date) - interval '12 months')::date a0),
 w as (select date_trunc('year', e1)::date s1, e1, (date_trunc('year', e1) - interval '1 year')::date s0, (e1 - interval '1 year')::date e0, a0 from p),
@@ -26,7 +27,7 @@ cw as (
   left join meter_reading_areas ar on ar.id = wt.meter_reading_area_id
   left join lateral (select substring(x.a from '(?:หมู่ที่|หมู่|ม\.)\s*(\d{1,2})') moo, substring(x.a from '(?:ตำบล|ต\.)\s*([ก-๙]+)') tb from addr x where x.cw = c.id) m on true),
 inv as (select distinct on (i.invoice_number, i.customer_water_id, i.issue_date, i.total, i.water_unit) i.*
-        from record_invoices i, w where i.status <> 'cancelled' and not exists (select 1 from vw_dash_credit_notes zr where zr.record_invoice_id = i.id and coalesce(zr.status, '') <> 'cancelled' and zr.total >= i.total - 0.01) and (i.issue_date between w.a0 and w.e1)
+        from record_invoices i, w where i.status <> 'cancelled' and not exists (select 1 from vw_dash_credit_notes zr where zr.record_invoice_id = i.id and (coalesce(zr.status, '') <> 'cancelled' or zr.credit_note_number in ('CN2608210003', 'CN2608210004')) and zr.total >= i.total - 0.01) and (i.issue_date between w.a0 and w.e1)
         order by i.invoice_number, i.customer_water_id, i.issue_date, i.total, i.water_unit, i.id),
 u as (
   select i.issue_date d, i.branch_id, i.customer_water_id cwid, 'W' src, i.sum wat, i.sum_service svc,
@@ -41,7 +42,7 @@ u as (
   from vw_dash_bill_invoice_fees f, w where f.status = 'active' and (f.bill_date between w.a0 and w.e1) and not exists (select 1 from record_invoices zd where zd.invoice_number = f.invoice_number and zd.customer_water_id = f.customer_water_id and zd.status <> 'cancelled')
   union all
   select n.issue_date, n.branch_id, n.customer_water_id, 'C', -(n.total * (n.sum + n.sum_service) / nullif(n.sum + n.sum_service + n.vat, 0)), 0::numeric, 0::numeric, null::numeric, 0::numeric
-  from vw_dash_credit_notes n, w where coalesce(n.status, '') <> 'cancelled' and not exists (select 1 from record_invoices zi where zi.id = n.record_invoice_id and n.total >= zi.total - 0.01) and (n.issue_date between w.a0 and w.e1)),
+  from vw_dash_credit_notes n, w where (coalesce(n.status, '') <> 'cancelled' or n.credit_note_number in ('CN2608210003', 'CN2608210004')) and not exists (select 1 from record_invoices zi where zi.id = n.record_invoice_id and n.total >= zi.total - 0.01) and (n.issue_date between w.a0 and w.e1)),
 x as (
   select extract(year from u.d)::int y, to_char(u.d, 'MM') mm, coalesce(b.name, 'ไม่ระบุ') br,
          coalesce(case when u.cwid = 4 then 'T2.2' when u.cwid = 2438 then 'T3.1' when u.cwid = 1363 and u.src = 'L' then 'T2.3' else cw.ty end, '?') ty, coalesce(cw.moo, 'ไม่ระบุหมู่') moo, u.src,

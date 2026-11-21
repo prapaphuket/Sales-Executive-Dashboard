@@ -2,12 +2,13 @@
 -- ฐานเวลา: วันที่ออกเอกสาร (ใบแจ้งหนี้ค่าน้ำ = record_invoices.issue_date, ใบแจ้งหนี้งานขาย = bill_invoice_fees.bill_date, ใบลดหนี้ = credit_notes.issue_date)
 -- $1::date = วันแรกของช่วง (date), $2::date = วันอ้างอิง/วันสุดท้ายของข้อมูล (date)
 -- src: W = ค่าน้ำ+ค่าบริการ (ใบแจ้งหนี้ค่าน้ำ) | L = ค่าน้ำลูกค้ารายใหญ่จากใบแจ้งหนี้ระบบเดิม (INT/IMK) | F = งานขายและบริการอื่น | C = ใบลดหนี้ (ติดลบ)
+-- ใบลดหนี้ ทอท. CN2608210003/CN2608210004 ถูกยกเลิกใน WMS 12/11/69 (รอบัญชียืนยัน) → ใช้สถานะก่อนยกเลิก (นับเป็นใบลดหนี้ที่ใช้งาน) ตามที่คุณวิชาญตัดสิน 21/11/69
 with big as (select unnest(array[4, 2438, 1363]) cw),  -- กปภ. AR00C-00029, ทอท. AR00C-02663, อบต.ไม้ขาว/หอถัง (เดิม NT63020004)
 cw as (select c.id, c.branch_id, c.dma_id, split_part(t.name, ' - ', 1) ty from vw_dash_customer_waters c left join customer_water_types t on t.id = case when c.id = 1363 then 11 else c.type_id end),
 inv as (  -- ตัดแถวซ้ำที่เหมือนกันทุกค่า (เลขเอกสาร ลูกค้า วันที่ ยอด หน่วย) เหลือแถวเดียว
   select distinct on (i.invoice_number, i.customer_water_id, i.issue_date, i.total, i.water_unit) i.*
   from record_invoices i
-  where i.status <> 'cancelled' and not exists (select 1 from vw_dash_credit_notes zr where zr.record_invoice_id = i.id and coalesce(zr.status, '') <> 'cancelled' and zr.total >= i.total - 0.01) and i.issue_date between $1::date and $2::date
+  where i.status <> 'cancelled' and not exists (select 1 from vw_dash_credit_notes zr where zr.record_invoice_id = i.id and (coalesce(zr.status, '') <> 'cancelled' or zr.credit_note_number in ('CN2608210003', 'CN2608210004')) and zr.total >= i.total - 0.01) and i.issue_date between $1::date and $2::date
   order by i.invoice_number, i.customer_water_id, i.issue_date, i.total, i.water_unit, i.id),
 w as (
   select to_char(i.issue_date, 'YYYY-MM') m, i.branch_id, coalesce(cw.ty, '?') ty, 'W' src,
@@ -41,7 +42,7 @@ c as (
   select to_char(n.issue_date, 'YYYY-MM') m, n.branch_id, coalesce(cw.ty, '?') ty, 'C' src,
          count(*) docs, -sum(n.total * (n.sum + n.sum_service) / nullif(n.sum + n.sum_service + n.vat, 0)) wat, 0::numeric svc, 0::numeric disc, null::numeric units, null::numeric free_units, -sum(n.total - n.total * (n.sum + n.sum_service) / nullif(n.sum + n.sum_service + n.vat, 0)) vat_doc
   from vw_dash_credit_notes n left join cw on cw.id = n.customer_water_id
-  where coalesce(n.status, '') <> 'cancelled' and not exists (select 1 from record_invoices zi where zi.id = n.record_invoice_id and n.total >= zi.total - 0.01) and n.issue_date between $1::date and $2::date
+  where (coalesce(n.status, '') <> 'cancelled' or n.credit_note_number in ('CN2608210003', 'CN2608210004')) and not exists (select 1 from record_invoices zi where zi.id = n.record_invoice_id and n.total >= zi.total - 0.01) and n.issue_date between $1::date and $2::date
   group by 1, 2, 3),
 u as (select * from w union all select * from l union all select * from f union all select * from c)
 select json_build_object('ds', 'sales_cube',

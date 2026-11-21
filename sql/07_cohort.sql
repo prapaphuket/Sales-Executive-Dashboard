@@ -1,8 +1,9 @@
 -- 07_cohort : อัตราจัดเก็บตามกลุ่มบิล — ใบแจ้งหนี้ค่าน้ำระบบใหม่ (ออกตั้งแต่ 1 มี.ค. 2569) ตามเดือนที่ออก ชำระแล้ว ณ วันอ้างอิง
 -- ตัวตั้งและตัวหารใช้ยอดรวม VAT ตามใบแจ้งหนี้ (total) ฐานเดียวกัน; ใบที่ส่วนลดเต็มจำนวน (total = 0) ไม่มีผลต่ออัตรา
+-- ใบลดหนี้ ทอท. CN2608210003/CN2608210004 ถูกยกเลิกใน WMS 12/11/69 (รอบัญชียืนยัน) → ใช้สถานะก่อนยกเลิก (นับเป็นใบลดหนี้ที่ใช้งาน) ตามที่คุณวิชาญตัดสิน 21/11/69
 with inv as (
   select distinct on (i.invoice_number, i.customer_water_id, i.issue_date, i.total, i.water_unit) i.*
-  from record_invoices i where i.status <> 'cancelled' and not exists (select 1 from vw_dash_credit_notes zr where zr.record_invoice_id = i.id and coalesce(zr.status, '') <> 'cancelled' and zr.total >= i.total - 0.01) and i.issue_date between greatest($1::date, date '2026-03-01') and $2::date
+  from record_invoices i where i.status <> 'cancelled' and not exists (select 1 from vw_dash_credit_notes zr where zr.record_invoice_id = i.id and (coalesce(zr.status, '') <> 'cancelled' or zr.credit_note_number in ('CN2608210003', 'CN2608210004')) and zr.total >= i.total - 0.01) and i.issue_date between greatest($1::date, date '2026-03-01') and $2::date
   order by i.invoice_number, i.customer_water_id, i.issue_date, i.total, i.water_unit, i.id),
 pay as (select record_invoice_id, min(coalesce(payment_date, issue_date)) pd, sum(total) paid from record_bills where status = 'paymented' group by 1),
 x as (

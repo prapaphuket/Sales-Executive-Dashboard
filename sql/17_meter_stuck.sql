@@ -7,6 +7,7 @@
 --   ชื่อ: ใบแจ้งหนี้ล่าสุด → ถ้ายังไม่เคยมีบิลใช้ customer_waters.name · วันติดตั้ง = water_meter_assignments.installed_at
 -- ข้อมูลบอกได้แค่ "เลขไม่ขยับ" — มิเตอร์เสีย หรือไม่มีผู้ใช้น้ำ ต้องให้หน้างานยืนยัน
 -- $1 = วันแรกของช่วงประวัติ, $2 = วันอ้างอิง
+-- ใบลดหนี้ ทอท. CN2608210003/CN2608210004 ถูกยกเลิกใน WMS 12/11/69 (รอบัญชียืนยัน) → ใช้สถานะก่อนยกเลิก (นับเป็นใบลดหนี้ที่ใช้งาน) ตามที่คุณวิชาญตัดสิน 21/11/69
 with rec as (
   select distinct on (customer_water_id, date_trunc('month', resp_date)) customer_water_id cw, date_trunc('month', resp_date)::date rnd,
          nullif(sum_unit, '')::numeric u, current_unit cu, record_date
@@ -32,7 +33,7 @@ nm as materialized (select w.id cw, coalesce(i.customer_name, nullif(trim(w.name
                   where status <> 'cancelled' and customer_water_id in (select cw from sel) order by customer_water_id, issue_date desc, id desc) i on i.customer_water_id = w.id
        where w.id in (select cw from sel)),
 price as (select customer_water_id cw, sum(sum + sum_service) / nullif(sum(water_unit), 0) p from record_invoices ri
-          where status <> 'cancelled' and not exists (select 1 from vw_dash_credit_notes zr where zr.record_invoice_id = ri.id and coalesce(zr.status, '') <> 'cancelled' and zr.total >= ri.total - 0.01) and water_unit > 0 and issue_date > $2::date - interval '12 months' and customer_water_id in (select cw from sel) group by 1)
+          where status <> 'cancelled' and not exists (select 1 from vw_dash_credit_notes zr where zr.record_invoice_id = ri.id and (coalesce(zr.status, '') <> 'cancelled' or zr.credit_note_number in ('CN2608210003', 'CN2608210004')) and zr.total >= ri.total - 0.01) and water_unit > 0 and issue_date > $2::date - interval '12 months' and customer_water_id in (select cw from sel) group by 1)
 select json_build_object('ds', 'meter_stuck',
   'round', (select to_char(rnd, 'YYYY-MM-DD') from cur),
   'first_round', (select to_char(min(rnd), 'YYYY-MM-DD') from rec),
