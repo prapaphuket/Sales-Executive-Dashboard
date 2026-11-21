@@ -34,8 +34,11 @@ K = {}
 for p, i, s, due, nsub, name in kids:
     K.setdefault(p, []).append({'id': i, 's': s, 'due': int(due) if due else None, 'n': name if name and not name.startswith('(') else None})
 tops = {t[0]: t for t in top}
+# ไม่แสดงโครงการของฝ่าย IT (ผู้รับผิดชอบ wichan boonchaiyo) ตามที่ผู้ใช้ขอ 21/11/69
+EXCLUDE_OWNERS = {'wichan boonchaiyo'}
 for i, lst, s, due, owner, name in top:
     if i in OUTS: continue
+    if (owner or '').strip().lower() in EXCLUDE_OWNERS: continue
     m = meta.get(i, {})
     st, late, nxt = kidstats(K.get(i, []))
     rows.append({'id': i, 'name': name, 'list': LISTS[lst], 'status': s, 'owner': owner or None, 'start': d(m.get('sd')), 'due': d(due) if due else None,
@@ -50,8 +53,8 @@ rows.append({'id': 'L901820077724', 'name': 'โครงการจัดห�
              'kids': st, 'late': late, 'next': nxt, 'phases': 4, 'sub': {'n': sub_n, 'open': sub_open},
              'note': 'รวม 4 ระยะ (Preparation → Bidding → Selection → Orientation) ที่เป็นงานระดับบนสุดใน List เดียวกัน · ผู้รับผิดชอบ = ผู้สร้างระยะงาน (ไม่มีผู้รับผิดชอบระบุในระยะ)'})
 out = {'ds': 'projects', 'source': 'ClickUp · Workspace 90182760752 · Space HEA 901811850930 (อ่านอย่างเดียว)', 'fetched_at': '2026-11-21T16:30:00+07:00', 'today': TODAY.strftime('%Y-%m-%d'),
-       'scope': 'งานระดับบนสุดทุก List ใน Space HEA + งานย่อยระดับแรก · ตัดงานระดับบนสุดที่ยกเลิก 29 รายการ (ส่วนใหญ่เป็นแผน Customer Care ชุดเดิมที่ทำซ้ำ)',
-       'cancelled_top': 29, 'rows': rows}
+       'scope': 'งานระดับบนสุดทุก List ใน Space HEA + งานย่อยระดับแรก · ตัดงานระดับบนสุดที่ยกเลิก 29 รายการ (ส่วนใหญ่เป็นแผน Customer Care ชุดเดิมที่ทำซ้ำ) · ไม่รวมโครงการของฝ่าย IT',
+       'cancelled_top': 29, 'excluded_owners': sorted(EXCLUDE_OWNERS), 'rows': rows}
 json.dump(out, open('data/projects.json', 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
 pr = [r for r in rows if r['kind'] == 'project']
 print(len(rows), 'rows ·', len(pr), 'projects')

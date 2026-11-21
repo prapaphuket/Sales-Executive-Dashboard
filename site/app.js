@@ -724,13 +724,21 @@
   }
 
   // ---------- โครงการ (ClickUp) ----------
+  const OPS_LISTS = ['แหล่งน้ำ', 'อ่างเก็บน้ำ', 'การผลิต/โรงงาน', 'ซ่อมบำรุง/ติดตั้งมิเตอร์', 'จัดหาผู้ให้บริการภายนอก (Outsource) จดมิเตอร์/ฝ่ายผลิต'];
+  const isOpsRow = (r) => OPS_LISTS.includes(r.list);
   function pProjects(el) {
-    const P = S.d.projects;
+    let P = S.d.projects;
     setTitle('โครงการ · ติดตามจาก ClickUp');
     if (!P) { el.innerHTML = '<div class="card state">ยังไม่มีข้อมูลโครงการ (ไฟล์ data/projects.json จาก ClickUp)</div>'; return; }
     setScope(`ClickUp Space HEA · ดึง ${dShort(P.fetched_at)}`);
     const today = P.today || TODAY_BKK(), in30 = new Date(Date.parse(today) + 30 * 86400000).toISOString().slice(0, 10);
     const isOpen = (s) => s !== 'complete' && s !== 'cancelled';
+    // เน้นโครงการของฝ่าย Operation (แหล่งน้ำ อ่างเก็บน้ำ การผลิต ซ่อมบำรุง/มิเตอร์ Outsource จดมิเตอร์/ฝ่ายผลิต) — เลือก "ทั้งหมด" เพื่อดูทุก List
+    const sc = S.pjScope || 'ops', allRows = P.rows, opsRows = allRows.filter(isOpsRow);
+    const rowsSc = sc === 'ops' ? opsRows : allRows;
+    $('head-tools').innerHTML = `<div class="seg2" role="group" aria-label="ขอบเขตโครงการ">${[['ops', 'Operation', opsRows.length], ['all', 'ทั้งหมด', allRows.length]].map(([k, t, n]) => `<button type="button" data-pj="${k}" aria-pressed="${k === sc}">${t} <small>${int(n)}</small></button>`).join('')}</div>`;
+    $('head-tools').querySelectorAll('[data-pj]').forEach((b) => b.addEventListener('click', () => { S.pjScope = b.dataset.pj; render({ still: true }); }));
+    P = { ...P, rows: rowsSc };
     const proj = P.rows.filter((r) => r.kind === 'project'), other = P.rows.filter((r) => r.kind !== 'project');
     const openP = proj.filter((r) => isOpen(r.status));
     const late = [], soon = [];
@@ -757,7 +765,7 @@
     el.innerHTML = `
       <div class="kpis">
         ${kpi('โครงการที่ยังเปิดอยู่', int(openP.length), 'โครงการ', 'งานระดับบนสุดที่มีแผนงาน/milestone เป็นงานย่อยพร้อมกำหนดส่ง · ที่เหลือแสดงแยกเป็น "รอยืนยันว่าเป็นโครงการ"', [['กำลังทำ', int(openP.filter((r) => r.status === 'in progress').length), ''], ['พักไว้', int(openP.filter((r) => r.status === 'on hold').length), 'v-warn'], ['ยังไม่เริ่ม', int(openP.filter((r) => r.status === 'not started').length), 'v-mute']], 'target')}
-        ${kpi('เกินกำหนดในโครงการ', int(lateP.length), 'รายการ', 'งานหลักหรืองานย่อยของโครงการที่ยังไม่ปิดและเลยวันกำหนดตาม ClickUp (เวลา Asia/Bangkok) · ไม่นับงานที่เสร็จหรือยกเลิก', [['ทั้ง Space', int(late.length) + ' รายการ', 'v-mute']])}
+        ${kpi('เกินกำหนดในโครงการ', int(lateP.length), 'รายการ', 'งานหลักหรืองานย่อยของโครงการที่ยังไม่ปิดและเลยวันกำหนดตาม ClickUp (เวลา Asia/Bangkok) · ไม่นับงานที่เสร็จหรือยกเลิก', [[sc === 'ops' ? 'รวมงานอื่นใน Operation' : 'ทั้ง Space', int(late.length) + ' รายการ', 'v-mute']])}
         ${kpi('ถึงกำหนดใน 30 วัน', int(soon.length), 'รายการ', `กำหนดส่งระหว่าง ${dShort(today)} – ${dShort(in30)}`, soon[0] ? [['ถัดไป', `${esc((soon[0].n || '').slice(0, 26))} · ${dShort(soon[0].d)}`, 'v-mute']] : [])}
         ${kpi('รอยืนยันว่าเป็นโครงการ', int(other.filter((r) => isOpen(r.status)).length), 'รายการ', 'งานระดับบนสุดที่ยังไม่มีแผนงาน/ผลส่งมอบชัดในข้อมูลที่ดึงมา เช่น งานประจำ งานเจรจา งานติดตามสัญญา', [['ปิดแล้ว (เสร็จ)', int(P.rows.filter((r) => r.status === 'complete').length), 'v-mute'], ['ยกเลิก (ไม่แสดง)', int(P.cancelled_top || 0), 'v-mute']])}
         ${waitKpi('Resource Utilization', 'ข้อมูลไม่พอ — ClickUp ไม่มีชั่วโมงทำงานจริงและชั่วโมงที่พร้อมใช้', 'Time tracking + ชั่วโมงงานต่อคน')}
@@ -883,7 +891,7 @@
     const nc = (ms) => sum(S.cust.filter((r) => ms.includes(r.m) && okBr(r.br) && okTy(r.ty) && !NEWX_CEO.includes(r.ty)), (r) => r.new);
     const P = pipeAgg(), PJ = S.d.projects, MN = S.d.maintenance;
     const today = (PJ && PJ.today) || TODAY_BKK();
-    const pjLate = PJ ? PJ.rows.filter((r) => r.kind === 'project' && r.status !== 'complete' && r.status !== 'cancelled').reduce((a, r) => a + (r.due && r.due < today ? 1 : 0) + (r.kids.overdue || 0), 0) : null;
+    const pjLate = PJ ? PJ.rows.filter(isOpsRow).filter((r) => r.kind === 'project' && r.status !== 'complete' && r.status !== 'cancelled').reduce((a, r) => a + (r.due && r.due < today ? 1 : 0) + (r.kids.overdue || 0), 0) : null;
     const mnProd = MN ? MN.rows.filter((r) => r.grp === 'prod' && r.st !== 'closed') : null;
     const src = (t) => `<div class="ceo-src">${t}</div>`;
     const ins = [];
@@ -896,9 +904,9 @@
       if (top && top.d) ins.push({ t: `ต้นทุนระบบผลิตตาม GL ${mLabel(lm)} ${mb(tc)} ล้านบาท (${tc >= tp ? '+' : '−'}${baht(Math.abs(tc - tp))} บาทจาก ${mLabel(pm)}) หมวดที่เปลี่ยนมากที่สุดคือ${GN[top.g]} ${top.d >= 0 ? '+' : '−'}${baht(Math.abs(top.d))} บาท`, e: 'ผลเบื้องต้นจากบัญชีแยกประเภท ยังไม่ยืนยันปิดงวด', l: ['#finance', 'ต้นทุนและบัญชี'] });
     }
     if (PJ) {
-      const nx = PJ.rows.filter((r) => r.kind === 'project' && r.status !== 'complete' && r.status !== 'cancelled').flatMap((r) => [r.next && r.next.d >= today ? { d: r.next.d, n: r.next.n, p: r.name } : null, r.due && r.due >= today ? { d: r.due, n: 'กำหนดเสร็จโครงการ', p: r.name } : null]).filter(Boolean).sort((x, y) => (x.d < y.d ? -1 : 1))[0];
+      const nx = PJ.rows.filter(isOpsRow).filter((r) => r.kind === 'project' && r.status !== 'complete' && r.status !== 'cancelled').flatMap((r) => [r.next && r.next.d >= today ? { d: r.next.d, n: r.next.n, p: r.name } : null, r.due && r.due >= today ? { d: r.due, n: 'กำหนดเสร็จโครงการ', p: r.name } : null]).filter(Boolean).sort((x, y) => (x.d < y.d ? -1 : 1))[0];
       if (nx) ins.push({ t: `งานโครงการที่ถึงกำหนดถัดไป: ${nx.n} (${nx.p}) กำหนด ${dLabel(nx.d)}`, e: `ทั้งหมดมีงานเกินกำหนด ${int(pjLate)} รายการตาม ClickUp — ตรวจว่าเป็นงานล่าช้าจริงหรือยังไม่อัปเดตสถานะ`, l: ['#projects', 'โครงการ'] });
-      else ins.push({ t: `โครงการมีงานเกินกำหนด ${int(pjLate)} รายการตาม ClickUp`, e: 'ยังไม่มีงานที่ตั้งกำหนดในอนาคต', l: ['#projects', 'โครงการ'] });
+      else ins.push({ t: `โครงการฝ่าย Operation มีงานเกินกำหนด ${int(pjLate)} รายการตาม ClickUp`, e: 'ยังไม่มีงานที่ตั้งกำหนดในอนาคต', l: ['#projects', 'โครงการ'] });
     }
     if (mnProd) ins.push({ t: `งานซ่อมระบบผลิต/สูบน้ำค้าง ${int(mnProd.length)} ใบ (รอช่างรับงาน ${int(mnProd.filter((r) => r.st === 'wait').length)})`, e: 'ค้างนานสุด ' + (mnProd.length ? int(Math.max(...mnProd.map((r) => daysBetween(r.reported, MN.ref)))) + ' วัน' : '–') + ` · ข้อมูลไฟล์งานซ่อมถึง ${dLabel(String(MN.last).slice(0, 10))}`, l: ['#maint', 'ซ่อมบำรุง'] });
     if (S.d.trc_recon) { const R = S.d.trc_recon, w = (R.reasons || []).find((x) => x[1] === 'bill_link_wrong'); if (w) ins.push({ t: `ใบเสร็จ ${int(w[2])} ใบผูกใบแจ้งหนี้คนละใบใน TRCLOUD (รอบ ${mLabel(R.month)})`, e: 'กระทบสถานะลูกหนี้ใน TRCLOUD — ให้ผู้พัฒนาระบบตรวจ', l: ['#meter', 'จดมาตรและออกบิล'] }); }
@@ -1086,7 +1094,7 @@
     collections: { t: 'การจัดเก็บและลูกหนี้', f: ['from', 'to', 'br', 'ty', 'asof'], sub: 'รับชำระตามใบเสร็จ WMS และอายุลูกหนี้ ณ วันอ้างอิง' },
     meter: { t: 'การจดมาตรและออกใบแจ้งหนี้', f: [], sub: 'ความคืบหน้าการจดมาตรรอบล่าสุด และการติดตามเอกสาร BL/IV ใน TRCLOUD' },
     finance: { t: 'การเงิน', f: [], sub: 'ยอดออกบิลตาม WMS และต้นทุนตามบัญชี TRCLOUD แสดงแยกกัน ไม่นำมารวมกัน' },
-    projects: { t: 'โครงการ', f: [], sub: 'สถานะโครงการ งานเกินกำหนด และงานถัดไปจาก ClickUp Space HEA' },
+    projects: { t: 'โครงการ', f: [], sub: 'เน้นโครงการฝ่าย Operation (แหล่งน้ำ การผลิต ซ่อมบำรุง/มิเตอร์ Outsource) จาก ClickUp Space HEA · เลือก “ทั้งหมด” เพื่อดูทุก List · ไม่รวมโครงการฝ่าย IT' },
     growth: { t: 'ภาพรวมการเติบโต', f: ['from', 'to', 'br', 'ty'], sub: 'เทียบช่วงที่เลือกกับช่วงเดียวกันปีก่อน ตามบริการ กลุ่มลูกค้า และพื้นที่ · ไม่คำนวณ CLV' },
     maint: { t: 'ซ่อมบำรุง', f: [], sub: 'งานซ่อมจากไฟล์ Factorium แยกระบบผลิต IT สำนักงาน และยานพาหนะ' },
     datasrc: { t: 'แหล่งข้อมูลและสถานะ KPI', f: [], sub: 'แต่ละตัวเลขมาจากไหน ดึงเมื่อไร และตัวไหนยังรอยืนยัน' },
