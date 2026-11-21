@@ -53,7 +53,7 @@ rows.append({'id': 'L901820077724', 'name': 'โครงการจัดห�
              'kids': st, 'late': late, 'next': nxt, 'phases': 4, 'sub': {'n': sub_n, 'open': sub_open},
              'note': 'รวม 4 ระยะ (Preparation → Bidding → Selection → Orientation) ที่เป็นงานระดับบนสุดใน List เดียวกัน · ผู้รับผิดชอบ = ผู้สร้างระยะงาน (ไม่มีผู้รับผิดชอบระบุในระยะ)'})
 out = {'ds': 'projects', 'source': 'ClickUp · Workspace 90182760752 · Space HEA 901811850930 (อ่านอย่างเดียว)', 'fetched_at': '2026-11-21T16:30:00+07:00', 'today': TODAY.strftime('%Y-%m-%d'),
-       'scope': 'งานระดับบนสุดทุก List ใน Space HEA + งานย่อยระดับแรก · ตัดงานระดับบนสุดที่ยกเลิก 29 รายการ (ส่วนใหญ่เป็นแผน Customer Care ชุดเดิมที่ทำซ้ำ) · ไม่รวมโครงการของฝ่าย IT',
+       'scope': 'งานระดับบนสุดทุก List ใน Space HEA + งานย่อยระดับแรก · ตัดงานระดับบนสุดที่ยกเลิก 29 รายการ (ส่วนใหญ่เป็นแผน Customer Care ชุดเดิมที่ทำซ้ำ)',
        'cancelled_top': 29, 'excluded_owners': sorted(EXCLUDE_OWNERS), 'rows': rows}
 json.dump(out, open('data/projects.json', 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
 pr = [r for r in rows if r['kind'] == 'project']

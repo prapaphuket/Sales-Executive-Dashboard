@@ -819,3 +819,20 @@ td.area{max-width:260px;width:260px}
 :root[data-theme="light"] .hdr .userbar button { background: #fff; color: var(--hea-navy); border-color: var(--line-strong); }
 @media (max-width: 640px) { .hdr .userbar button { padding: 4px 10px; } }
 .hdr .userbar { display: flex; } .hdr .userbar[hidden] { display: none; } .hdr .userbar #who { margin-right: 4px; }
+/* คอลัมน์ซ้อนการ์ด (ใช้ใน grid g2 ให้การ์ดสั้นสองใบอยู่คอลัมน์เดียวกัน) */
+.stack { display: grid; gap: 16px; align-content: start; min-width: 0; }
+.t td .nw, .small.nw { white-space: nowrap; }
+
+/* การ์ด KPI: จำนวนคอลัมน์ตามจำนวนการ์ด ไม่ให้การ์ดแคบจนข้อความล้น */
+.kpis.kc-1 { grid-template-columns: minmax(0, 1fr); }
+.kpis.kc-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.kpis.kc-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.kpis.kc-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.kpis.kc-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+@media (max-width: 1280px) { .kpis.kc-5 { grid-template-columns: repeat(3, minmax(0, 1fr)); } .kpis.kc-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .kpis[class*="kc-"] { grid-template-columns: minmax(0, 1fr); } }
+.kpi .info { margin: -4px 0; }
+.kpi .rows > div { align-items: baseline; }
+.kpi .rows .k { min-width: 0; }
+.kpi .label { line-height: 1.4; }
+.pf-links[hidden] { display: none !important; }
