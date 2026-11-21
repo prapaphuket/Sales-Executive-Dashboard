@@ -693,9 +693,10 @@
         ${card('c-fin-cost', 'ต้นทุนระบบผลิตรายเดือนตาม GL', `ล้านบาท · ${dShort(F.from)} – ${dShort(F.to)} · เดบิต − เครดิต · ไม่รวมค่าไฟฟ้าสำนักงาน`, '', '<div class="chart" id="ch-fin-cost" style="height:300px"></div>', { table: 1 })}
         ${card('c-fin-acc', 'ต้นทุนแยกบัญชี (สะสมตั้งแต่ต้นปี)', `ม.ค.–${mLabel(lf)} · ยังไม่ใช่งบที่ปิดงวด · GL เริ่ม ม.ค. 69 จึงไม่เทียบปีก่อน`, '', table([
           { h: 'บัญชี', f: (r) => `<b>${esc(r.code)}</b> ${esc(r.name)}` }, { h: 'กลุ่ม', f: (r) => esc(GRP[r.grp] || r.grp) },
-          { h: 'ม.ค.–' + mLabel(lf) + ' (บาท)', n: 1, f: (r) => baht(r.y), v: (r) => r.y.toFixed(2) }, { h: 'เฉลี่ย/เดือน', n: 1, f: (r) => baht(r.y / ytd.length), v: (r) => (r.y / ytd.length).toFixed(2) },
+          { h: 'ม.ค.–' + mLabel(lf) + ' (บาท)', n: 1, f: (r) => barCell(baht(r.y), r.y, Math.max(...accRows.map((x) => x.y)), 'var(--accent)'), v: (r) => r.y.toFixed(2) }, { h: 'เฉลี่ย/เดือน', n: 1, f: (r) => baht(r.y / ytd.length), v: (r) => (r.y / ytd.length).toFixed(2) },
+          { h: `${mLabel(F.to.slice(0, 7))} เทียบ ${mLabel(addM(F.to.slice(0, 7), -1))}`, n: 1, f: (r) => { const lm = F.to.slice(0, 7), pm = addM(lm, -1); const c = sum(rows.filter((x) => x.code === r.code && x.m === lm), (x) => x.net), q = sum(rows.filter((x) => x.code === r.code && x.m === pm), (x) => x.net), d = c - q; return Math.abs(d) < 0.5 ? '<span class="muted">–</span>' : `<span class="${d > 0 ? 'neg' : 'pos'}" title="ต้นทุนเพิ่ม = แดง · ลด = เขียว">${d > 0 ? '▲ +' : '▼ −'}${baht(Math.abs(d))}</span>`; } },
           { h: 'สัดส่วน', n: 1, f: (r) => pct(sum(accRows, (x) => x.y) ? r.y / sum(accRows, (x) => x.y) : null) }, { h: 'รายการ GL', n: 1, f: (r) => int(r.n), v: (r) => r.n }],
-          accRows, [{ h: '<b>รวม</b>' }, null, { h: `<b>${baht(sum(accRows, (r) => r.y))}</b>`, v: sum(accRows, (r) => r.y).toFixed(2) }, null, null, { h: `<b>${int(sum(accRows, (r) => r.n))}</b>` }]), { csv: 1, foot: F.notes.map(esc).join('<br>') })}
+          accRows, [{ h: '<b>รวม</b>' }, null, { h: `<b>${baht(sum(accRows, (r) => r.y))}</b>`, v: sum(accRows, (r) => r.y).toFixed(2) }, null, null, null, { h: `<b>${int(sum(accRows, (r) => r.n))}</b>` }]), { csv: 1, foot: F.notes.map(esc).join('<br>') })}
       </div>`;
     } else {
       costKpi = waitKpi('ต้นทุนระบบผลิตตาม GL', 'ยังไม่มีไฟล์ data/finance.json', 'ดึง GL บัญชีต้นทุนผลิตจาก TRCLOUD');
@@ -768,11 +769,11 @@
       { h: 'งานย่อย', f: subTxt, v: (r) => `${r.kids.done}/${r.kids.n - r.kids.cancel}` }, { h: 'อัปเดตล่าสุด', f: (r) => dShort(r.updated), v: (r) => r.updated || '' }];
     const icols = [{ h: 'วันกำหนด', f: (x) => dShort(x.d), v: (x) => x.d }, { h: 'รายการ', f: (x) => (x.n ? extLink(x.url, x.n) : extLink(x.url, 'งาน ' + x.id)), v: (x) => x.n || x.id },
       { h: 'ระดับ', k: 'lvl' }, { h: 'อยู่ใต้', f: (x) => esc(x.p.name), v: (x) => x.p.name }, { h: 'ผู้รับผิดชอบงานหลัก', f: (x) => esc(x.p.owner || '—'), v: (x) => x.p.owner || '' }];
-    const lateCols = icols.concat([{ h: 'เกินมา', n: 1, f: (x) => `${int(daysBetween(x.d, today))} วัน`, v: (x) => daysBetween(x.d, today) }]);
+    const lateCols = icols.concat([{ h: 'เกินมา', n: 1, f: (x) => { const d = daysBetween(x.d, today); return `<span class="pill ${d > 90 ? 'down' : 'warn'}">${int(d)} วัน</span>`; }, v: (x) => daysBetween(x.d, today) }]);
     el.innerHTML = `
       <div class="kpis">
         ${kpi('โครงการที่ยังเปิดอยู่', int(openP.length), 'โครงการ', 'งานระดับบนสุดที่มีแผนงาน/milestone เป็นงานย่อยพร้อมกำหนดส่ง · ที่เหลือแสดงแยกเป็น "รอยืนยันว่าเป็นโครงการ"', [['กำลังทำ', int(openP.filter((r) => r.status === 'in progress').length), ''], ['พักไว้', int(openP.filter((r) => r.status === 'on hold').length), 'v-warn'], ['ยังไม่เริ่ม', int(openP.filter((r) => r.status === 'not started').length), 'v-mute']], 'target')}
-        ${kpi('เกินกำหนดในโครงการ', int(lateP.length), 'รายการ', 'งานหลักหรืองานย่อยของโครงการที่ยังไม่ปิดและเลยวันกำหนดตาม ClickUp (เวลา Asia/Bangkok) · ไม่นับงานที่เสร็จหรือยกเลิก', [[sc === 'ops' ? 'รวมงานอื่นใน Operation' : 'ทั้ง Space', int(late.length) + ' รายการ', 'v-mute']])}
+        ${kpi('เกินกำหนดในโครงการ', int(lateP.length), 'รายการ', 'งานหลักหรืองานย่อยของโครงการที่ยังไม่ปิดและเลยวันกำหนดตาม ClickUp (เวลา Asia/Bangkok) · ไม่นับงานที่เสร็จหรือยกเลิก', [[sc === 'ops' ? 'รวมงานอื่นใน Operation' : 'ทั้ง Space', int(late.length) + ' รายการ', 'v-mute']], lateP.length ? 'bad' : '', { vcls: lateP.length ? 'v-bad' : '' })}
         ${kpi('ถึงกำหนดใน 30 วัน', int(soon.length), 'รายการ', `กำหนดส่งระหว่าง ${dShort(today)} – ${dShort(in30)}`, soon[0] ? [['ถัดไป', `${esc((soon[0].n || '').slice(0, 26))} · ${dShort(soon[0].d)}`, 'v-mute']] : [])}
         ${kpi('รอยืนยันว่าเป็นโครงการ', int(other.filter((r) => isOpen(r.status)).length), 'รายการ', 'งานระดับบนสุดที่ยังไม่มีแผนงาน/ผลส่งมอบชัดในข้อมูลที่ดึงมา เช่น งานประจำ งานเจรจา งานติดตามสัญญา', [['ปิดแล้ว (เสร็จ)', int(P.rows.filter((r) => r.status === 'complete').length), 'v-mute'], ['ยกเลิก (ไม่แสดง)', int(P.cancelled_top || 0), 'v-mute']])}
         ${waitKpi('Resource Utilization', 'ข้อมูลไม่พอ — ClickUp ไม่มีชั่วโมงทำงานจริงและชั่วโมงที่พร้อมใช้', 'Time tracking + ชั่วโมงงานต่อคน')}
@@ -813,6 +814,7 @@
     const outS = { name: 'ซ่อมเสร็จ (วันเวลาที่ซ่อมเสร็จ)', type: 'bar', data: ms.map((m) => R.filter((r) => r.done && r.done.slice(0, 7) === m).length), itemStyle: barStyle(C.oliveChart) };
     chartTable('c-mnt-m', ms.map(mLabel), [inS, outS], 'u');
     const cnt = (key, rows) => { const o = {}; rows.forEach((r) => { const k = r[key] || 'ไม่ระบุ'; (o[k] = o[k] || { k, n: 0, open: 0 }).n++; if (r.st !== 'closed') o[k].open++; }); return Object.values(o).sort((a, b) => b.n - a.n); };
+    const cntB = (key, rows) => { const o = cnt(key, rows), m = Math.max(1, ...o.map((x) => x.n)); return o.map((x) => ({ ...x, nMax: m })); };
     const qr = {}; R.filter((r) => r.qr).forEach((r) => { (qr[r.qr] = qr[r.qr] || []).push(r); });
     const rep = Object.entries(qr).filter(([, l]) => l.length > 1).map(([q, l]) => ({ q, l, n: l.length, m: l[0].machine, open: l.filter((r) => r.st !== 'closed').length, last: l.map((r) => r.reported).sort().pop() })).sort((a, b) => b.n - a.n);
     const age = (r) => daysBetween(r.reported, ref);
@@ -833,7 +835,7 @@
       </div>
       <div class="grid g2" style="margin-top:16px">
         ${card('c-mnt-m', 'ใบงานแจ้งเข้าและซ่อมเสร็จรายเดือน', 'แจ้งเข้า = วันที่แจ้งซ่อมจริง · ซ่อมเสร็จ = วันเวลาที่ซ่อมเสร็จในระบบ', '', '<div class="chart" id="ch-mnt-m" style="height:280px"></div>', { table: 1 })}
-        ${card('c-mnt-st', 'สถานะใบงาน', 'แยก 4 สถานะ · ปิดงานแยกตามผลการซ่อม', '', table([{ h: 'สถานะ', k: 'k' }, { h: 'ใบงาน', n: 1, f: (x) => int(x.n), v: (x) => x.n }, { h: 'สัดส่วน', n: 1, f: (x) => pct(R.length ? x.n / R.length : null) }], [
+        ${card('c-mnt-st', 'สถานะใบงาน', 'แยก 4 สถานะ · ปิดงานแยกตามผลการซ่อม', '', table([{ h: 'สถานะ', k: 'k' }, { h: 'ใบงาน', n: 1, f: (x) => barCell(int(x.n), x.n, R.length, 'var(--accent)'), v: (x) => x.n }, { h: 'สัดส่วน', n: 1, f: (x) => pct(R.length ? x.n / R.length : null) }], [
           { k: MST.wait, n: R.filter((r) => r.st === 'wait').length }, { k: MST.doing, n: R.filter((r) => r.st === 'doing').length }, { k: MST.eval, n: R.filter((r) => r.st === 'eval').length },
           { k: 'ปิดงาน — ซ่อมแล้ว', n: closed.length - nofix.length }, { k: 'ปิดงาน — ไม่ได้ซ่อม (ยกเลิกการซ่อม)', n: nofix.length }]), { csv: 1 })}
       </div>
@@ -845,9 +847,9 @@
           open.slice().sort((a, b) => (a.grp === 'prod' ? 0 : 1) - (b.grp === 'prod' ? 0 : 1) || a.reported.localeCompare(b.reported))), { csv: 1 })}
       </div>
       <div class="grid g3" style="margin-top:16px">
-        ${card('c-mnt-dept', 'ตามแผนกของเครื่องจักร', '', '', table([{ h: 'แผนก', k: 'k' }, { h: 'ใบงาน', n: 1, f: (x) => int(x.n), v: (x) => x.n }, { h: 'ค้าง', n: 1, f: (x) => int(x.open), v: (x) => x.open }], cnt('dept', R)), { csv: 1 })}
-        ${card('c-mnt-type', 'ตามประเภทใบงาน', '', '', table([{ h: 'ประเภทใบงาน', k: 'k' }, { h: 'ใบงาน', n: 1, f: (x) => int(x.n), v: (x) => x.n }, { h: 'ค้าง', n: 1, f: (x) => int(x.open), v: (x) => x.open }], cnt('type', R)), { csv: 1 })}
-        ${card('c-mnt-mt', 'ตามประเภทเครื่องจักร', '', '', table([{ h: 'ประเภทเครื่องจักร', k: 'k' }, { h: 'ใบงาน', n: 1, f: (x) => int(x.n), v: (x) => x.n }, { h: 'ค้าง', n: 1, f: (x) => int(x.open), v: (x) => x.open }], cnt('mtype', R)), { csv: 1 })}
+        ${card('c-mnt-dept', 'ตามแผนกของเครื่องจักร', '', '', table([{ h: 'แผนก', k: 'k' }, { h: 'ใบงาน', n: 1, f: (x) => barCell(int(x.n), x.n, x.nMax, 'var(--accent)'), v: (x) => x.n }, { h: 'ค้าง', n: 1, f: (x) => (x.open ? `<span class="pill down">${int(x.open)}</span>` : '<span class="muted">0</span>'), v: (x) => x.open }], cntB('dept', R)), { csv: 1 })}
+        ${card('c-mnt-type', 'ตามประเภทใบงาน', '', '', table([{ h: 'ประเภทใบงาน', k: 'k' }, { h: 'ใบงาน', n: 1, f: (x) => barCell(int(x.n), x.n, x.nMax, 'var(--accent)'), v: (x) => x.n }, { h: 'ค้าง', n: 1, f: (x) => (x.open ? `<span class="pill down">${int(x.open)}</span>` : '<span class="muted">0</span>'), v: (x) => x.open }], cntB('type', R)), { csv: 1 })}
+        ${card('c-mnt-mt', 'ตามประเภทเครื่องจักร', '', '', table([{ h: 'ประเภทเครื่องจักร', k: 'k' }, { h: 'ใบงาน', n: 1, f: (x) => barCell(int(x.n), x.n, x.nMax, 'var(--accent)'), v: (x) => x.n }, { h: 'ค้าง', n: 1, f: (x) => (x.open ? `<span class="pill down">${int(x.open)}</span>` : '<span class="muted">0</span>'), v: (x) => x.open }], cntB('mtype', R)), { csv: 1 })}
       </div>
       <div class="grid g2" style="margin-top:16px">
         ${card('c-mnt-rep', 'เครื่องจักร/ทรัพย์สินที่แจ้งซ้ำ (QR Code เดียวกัน)', 'นับเฉพาะใบงานที่มี QR Code · ใช้ดูจุดที่เสียบ่อย', '', rep.length ? table([{ h: 'QR Code', k: 'q' }, { h: 'เครื่องจักร', f: (x) => esc(x.m), v: (x) => x.m }, { h: 'ใบงาน', n: 1, f: (x) => int(x.n), v: (x) => x.n }, { h: 'ค้าง', n: 1, f: (x) => int(x.open), v: (x) => x.open }, { h: 'แจ้งล่าสุด', f: (x) => dShort(x.last), v: (x) => x.last.slice(0, 10) }], rep) : '<div class="state">ไม่พบ QR Code ที่แจ้งซ้ำในกลุ่มนี้</div>', { csv: 1 })}
@@ -968,13 +970,13 @@
       ${waitKpi('Lead', 'ยังไม่มีระบบบันทึกผู้สนใจ/ผู้ติดต่อก่อนยื่นคำร้อง', 'ทะเบียน Lead จากฝ่ายกลยุทธ์ (แหล่ง วันที่ ผู้ดูแล)')}
       ${waitKpi('Opportunity', 'ยังไม่มีทะเบียนดีลรายใหญ่/สัญญาที่กำลังเจรจา', 'รายการโอกาสพร้อมมูลค่าคาดการณ์และสถานะ')}
       ${waitKpi('CLV', 'ยังไม่มีอายุลูกค้าเฉลี่ยและต้นทุนต่อบัญชีที่ยืนยัน — ใช้ “รายได้เฉลี่ยต่อบัญชี” ด้านล่างแทน', 'อัตราการเลิกใช้น้ำและกำไรต่อบัญชีจากบัญชี')}
-      ${kpi('อัตราคำร้องติดตั้งสำเร็จ', pct(nComp + nCan ? nComp / (nComp + nCan) : null), '', 'ใช้แทน Win Rate ไม่ได้โดยตรง: คำร้องที่ติดตั้งสำเร็จ ÷ คำร้องที่ปิดแล้ว (สำเร็จ + ยกเลิก) ทั้งหมดในระบบ ไม่แยกช่วงเวลา', [['สำเร็จ', int(nComp) + ' ราย'], ['ยกเลิก', int(nCan) + ' ราย']])}
+      ${kpi('อัตราคำร้องติดตั้งสำเร็จ', pct(nComp + nCan ? nComp / (nComp + nCan) : null), '', 'ใช้แทน Win Rate ไม่ได้โดยตรง: คำร้องที่ติดตั้งสำเร็จ ÷ คำร้องที่ปิดแล้ว (สำเร็จ + ยกเลิก) ทั้งหมดในระบบ ไม่แยกช่วงเวลา', [['สำเร็จ', int(nComp) + ' ราย', 'v-good'], ['ยกเลิก', int(nCan) + ' ราย', 'v-bad']], 'accent')}
     </div>`;
     const real = `<div class="grid g4">
-      ${kpi('Sales Cycle · ยื่นคำร้อง → เริ่มใช้น้ำ', cyc == null ? '–' : int(cyc), 'วัน', 'เฉลี่ยถ่วงจำนวนราย ของคำร้องที่เริ่มใช้น้ำในช่วงที่เลือก (ข้อมูลคำร้องเริ่ม มี.ค. 2569) · ไม่แยกสาขา/ประเภท', [['ติดตั้งในช่วง', int(nDone) + ' ราย'], ['ช่วง', span]], '', { link: ['#customers', 'ดูคำร้องในหน้าลูกค้า'] })}
-      ${kpi('คำร้องขอใช้น้ำที่ยังเปิด', P ? int(P.nOpen) : '–', 'ราย', 'สถานะรอดำเนินการ/กำลังดำเนินการ/อนุมัติรอติดตั้ง ณ วันดึงข้อมูล · ตัวกรองสาขามีผล', P ? [['เกิน 60 วัน', int(P.over60) + ' ราย', P.over60 ? 'down' : ''], ['ติดตั้งเฉลี่ย 6 เดือนล่าสุด', nf1.format(P.perMonth) + ' ราย/เดือน']] : null)}
-      ${kpi('ลูกค้าใหม่', int(ncC), 'ราย', 'ใบแจ้งหนี้ค่าน้ำใบแรกอยู่ในช่วงที่เลือก · ไม่นับลูกค้าสัญญาที่ย้ายเข้าระบบ (กปภ. อบต. ทอท.)', [ncP != null ? ['ปีก่อนช่วงเดียวกัน', `${int(ncP)} ราย`, ncC >= ncP ? 'up' : 'down'] : ['ปีก่อน', 'ไม่มีฐานเทียบ']])}
-      ${kpi('รายได้เฉลี่ยต่อบัญชี', A1.v == null ? '–' : int(A1.v), 'บาท/เดือน', 'ค่าน้ำ + ค่าบริการ − ส่วนลด (ไม่รวม VAT) ของใบแจ้งหนี้ค่าน้ำ ÷ จำนวนบัญชีที่ออกบิลรวมทุกเดือนในช่วง', [['บัญชีที่ออกบิลเฉลี่ย', int(A1.avg) + ' บัญชี/เดือน'], A0 && A0.v ? ['ปีก่อน', `${int(A0.v)} บาท (${pctTxt(chg(A1.v, A0.v))})`, A1.v >= A0.v ? 'up' : 'down'] : null])}
+      ${kpi('Sales Cycle · ยื่นคำร้อง → เริ่มใช้น้ำ', cyc == null ? '–' : int(cyc), 'วัน', 'เฉลี่ยถ่วงจำนวนราย ของคำร้องที่เริ่มใช้น้ำในช่วงที่เลือก (ข้อมูลคำร้องเริ่ม มี.ค. 2569) · ไม่แยกสาขา/ประเภท', [['ติดตั้งในช่วง', int(nDone) + ' ราย'], ['ช่วง', span, 'v-mute']], 'target', { link: ['#customers', 'ดูคำร้องในหน้าลูกค้า'] })}
+      ${kpi('คำร้องขอใช้น้ำที่ยังเปิด', P ? int(P.nOpen) : '–', 'ราย', 'สถานะรอดำเนินการ/กำลังดำเนินการ/อนุมัติรอติดตั้ง ณ วันดึงข้อมูล · ตัวกรองสาขามีผล', P ? [['เกิน 60 วัน', int(P.over60) + ' ราย', P.over60 ? 'v-bad' : 'v-good'], ['ติดตั้งเฉลี่ย 6 เดือนล่าสุด', nf1.format(P.perMonth) + ' ราย/เดือน']] : null, P && P.over60 ? 'bad' : '')}
+      ${kpi('ลูกค้าใหม่', int(ncC), 'ราย', 'ใบแจ้งหนี้ค่าน้ำใบแรกอยู่ในช่วงที่เลือก · ไม่นับลูกค้าสัญญาที่ย้ายเข้าระบบ (กปภ. อบต. ทอท.)', [cmpRow('YoY', ncC, ncP), ['ปีก่อนช่วงเดียวกัน', ncP != null ? `${int(ncP)} ราย` : 'ไม่มีฐานเทียบ', 'v-mute']], 'accent')}
+      ${kpi('รายได้เฉลี่ยต่อบัญชี', A1.v == null ? '–' : int(A1.v), 'บาท/เดือน', 'ค่าน้ำ + ค่าบริการ − ส่วนลด (ไม่รวม VAT) ของใบแจ้งหนี้ค่าน้ำ ÷ จำนวนบัญชีที่ออกบิลรวมทุกเดือนในช่วง', [cmpRow('YoY', A1.v, A0 && A0.v), ['ปีก่อน', A0 && A0.v ? `${int(A0.v)} บาท` : 'ไม่มีฐานเทียบ', 'v-mute'], ['บัญชีที่ออกบิลเฉลี่ย', int(A1.avg) + ' บัญชี/เดือน']])}
     </div>`;
     // ติดตั้งรายเดือน
     const dn = P ? P.done : [];
@@ -987,8 +989,8 @@
       <h2 class="sec-title">ตัวชี้วัดที่ข้อมูลรองรับ · ${esc(span)}</h2>${real}
       <h2 class="sec-title">ตัวชี้วัดการขายที่ยังไม่มีแหล่งข้อมูล</h2>${wait}
       <div class="grid g2">
-        ${card('c-so-done', 'ติดตั้งใหม่และระยะเวลาเฉลี่ยรายเดือน', 'คำร้องที่เริ่มใช้น้ำ (นับตามเดือนที่เริ่มใช้น้ำ) · ระยะเวลา = วันที่ยื่นคำร้องถึงวันเริ่มใช้น้ำ', '', table([{ h: 'เดือน', f: (r) => mLabel(r.m), v: (r) => r.m }, { h: 'ติดตั้ง (ราย)', n: 1, f: (r) => int(r.n), v: (r) => r.n }, { h: 'เฉลี่ย (วัน)', n: 1, f: (r) => int(r.d), v: (r) => r.d }], dn.slice().reverse(), ['รวม', int(sum(dn, (x) => x.n)), '']), { csv: 1 })}
-        ${card('c-so-open', 'คำร้องที่ยังเปิด แยกประเภทผู้ขอ', 'ณ วันดึงข้อมูล · ตัวกรองสาขามีผล · อายุ = วันนับจากยื่นคำร้อง', 'สาขา', table([{ h: 'ประเภทผู้ขอ', f: (r) => esc(PIPE_KN[r.k] || r.k) }, { h: 'ราย', n: 1, f: (r) => int(r.n), v: (r) => r.n }, { h: 'อายุเฉลี่ย (วัน)', n: 1, f: (r) => int(r.age / r.n), v: (r) => r.age / r.n }, { h: 'เกิน 60 วัน', n: 1, f: (r) => int(r.over60), v: (r) => r.over60 }], kRows, ['รวม', int(sum(kRows, (r) => r.n)), '', int(sum(kRows, (r) => r.over60))]) + `<div class="small" style="margin-top:8px">${Object.entries(STN).map(([k, t]) => `${t} ${int(sum(open.filter((r) => r.status === k), (r) => r.n))} ราย`).join(' · ')}</div>`, { csv: 1 })}
+        ${card('c-so-done', 'ติดตั้งใหม่และระยะเวลาเฉลี่ยรายเดือน', 'คำร้องที่เริ่มใช้น้ำ (นับตามเดือนที่เริ่มใช้น้ำ) · ระยะเวลา = วันที่ยื่นคำร้องถึงวันเริ่มใช้น้ำ', '', table([{ h: 'เดือน', f: (r) => mLabel(r.m), v: (r) => r.m }, { h: 'ติดตั้ง (ราย)', n: 1, f: (r) => barCell(int(r.n), r.n, Math.max(...dn.map((x) => x.n)), 'var(--accent)'), v: (r) => r.n }, { h: 'เฉลี่ย (วัน)', n: 1, f: (r) => `<span class="${r.d > 60 ? 'neg' : r.d <= 30 ? 'pos' : ''}">${int(r.d)}</span>`, v: (r) => r.d }], dn.slice().reverse(), ['รวม', int(sum(dn, (x) => x.n)), '']), { csv: 1 })}
+        ${card('c-so-open', 'คำร้องที่ยังเปิด แยกประเภทผู้ขอ', 'ณ วันดึงข้อมูล · ตัวกรองสาขามีผล · อายุ = วันนับจากยื่นคำร้อง', 'สาขา', table([{ h: 'ประเภทผู้ขอ', f: (r) => esc(PIPE_KN[r.k] || r.k) }, { h: 'ราย', n: 1, f: (r) => barCell(int(r.n), r.n, Math.max(...kRows.map((x) => x.n)), 'var(--accent)'), v: (r) => r.n }, { h: 'อายุเฉลี่ย (วัน)', n: 1, f: (r) => `<span class="${r.age / r.n > 60 ? 'neg' : ''}">${int(r.age / r.n)}</span>`, v: (r) => r.age / r.n }, { h: 'เกิน 60 วัน', n: 1, f: (r) => (r.over60 ? `<span class="pill down">${int(r.over60)}</span>` : '<span class="muted">0</span>'), v: (r) => r.over60 }], kRows, ['รวม', int(sum(kRows, (r) => r.n)), '', int(sum(kRows, (r) => r.over60))]) + `<div class="small" style="margin-top:8px">${Object.entries(STN).map(([k, t]) => `${t} ${int(sum(open.filter((r) => r.status === k), (r) => r.n))} ราย`).join(' · ')}</div>`, { csv: 1 })}
       </div>`;
   }
 
@@ -1003,8 +1005,9 @@
     const exP = (a, b) => sum(rows(a, b).filter((r) => r.ty !== 'T2.2'), (r) => r.net);
     const eC = exP(from, to), eP = yo ? exP(pf, pt) : null;
     const A1 = arpa(from, to), A0 = yo ? arpa(pf, pt) : null;
-    const cmp = (c, p) => (p == null ? '<span class="v-mute">ไม่มีฐานเทียบ</span>' : `<span class="${c >= p ? 'up' : 'down'}">${c >= p ? '▲' : '▼'} ${pctTxt(chg(c, p))}</span>`);
-    const gcol = (lab, kf) => [{ h: lab, f: kf }, { h: span, n: 1, f: (r) => baht(r.c), v: (r) => r.c }, { h: spanP, n: 1, f: (r) => (yo ? baht(r.p) : '–'), v: (r) => r.p ?? '' }, { h: 'เปลี่ยน (บาท)', n: 1, f: (r) => (yo ? `<span class="${r.c - r.p >= 0 ? 'up' : 'down'}">${r.c - r.p >= 0 ? '+' : ''}${baht(r.c - r.p)}</span>` : '–'), v: (r) => (yo ? r.c - r.p : '') }, { h: 'เปลี่ยน (%)', n: 1, f: (r) => (yo ? cmp(r.c, r.p) : '–') }, { h: 'สัดส่วน', n: 1, f: (r) => pct(cur.net ? r.c / cur.net : null) }];
+    const cmp = (c, p) => (p == null || !p ? '<span class="muted">–</span>' : `<span class="${c >= p ? 'pos' : 'neg'}">${c >= p ? '▲' : '▼'} ${pctTxt(chg(c, p))}</span>`);
+    const dBaht = (c, p) => `<span class="${c - p >= 0 ? 'pos' : 'neg'}">${c - p >= 0 ? '+' : '−'}${baht(Math.abs(c - p))}</span>`;
+    const gcol = (lab, kf, rs, color) => { const mx = Math.max(1, ...(rs || []).map((r) => Math.abs(r.c))); return [{ h: lab, f: kf }, { h: span, n: 1, f: (r) => barCell(baht(r.c), Math.abs(r.c), mx, typeof color === 'function' ? color(r) : color || C.navy), v: (r) => r.c }, { h: spanP, n: 1, f: (r) => (yo ? `<span class="muted">${baht(r.p)}</span>` : '–'), v: (r) => r.p ?? '' }, { h: 'เปลี่ยน (บาท)', n: 1, f: (r) => (yo ? dBaht(r.c, r.p) : '–'), v: (r) => (yo ? r.c - r.p : '') }, { h: 'เปลี่ยน (%)', n: 1, f: (r) => (yo ? cmp(r.c, r.p) : '–') }, { h: 'สัดส่วน', n: 1, f: (r) => pct(cur.net ? r.c / cur.net : null) }]; };
     // ตามบริการ
     const svc = [
       { k: 'ค่าน้ำ', c: cur.water - cur.disc, p: prv ? prv.water - prv.disc : null },
@@ -1031,27 +1034,27 @@
     if (yo) {
       const mv = byTy.map((o) => ({ ...o, d: o.c - o.p })).sort((a, b) => a.d - b.d);
       const dn = mv[0], up = mv[mv.length - 1];
-      if (dn && dn.d < 0) ins.push({ t: `กลุ่มที่รายได้ลดมากที่สุด: ${dn.name} −${mb(-dn.d)} ล้านบาท เทียบ ${spanP}`, l: ['#revenue', 'ดูรายได้ตามกลุ่มลูกค้า'] });
-      if (up && up.d > 0) ins.push({ t: `กลุ่มที่รายได้เพิ่มมากที่สุด: ${up.name} +${mb(up.d)} ล้านบาท`, l: ['#revenue', 'ดูรายได้ตามกลุ่มลูกค้า'] });
+      if (dn && dn.d < 0) ins.push({ dir: -1, t: `กลุ่มที่รายได้ลดมากที่สุด: ${dn.name}`, v: `−${mb(-dn.d)} ล้านบาท (${pctTxt(chg(dn.c, dn.p))})`, e: `เทียบ ${spanP}`, l: ['#revenue', 'รายได้ตามกลุ่มลูกค้า'] });
+      if (up && up.d > 0) ins.push({ dir: 1, t: `กลุ่มที่รายได้เพิ่มมากที่สุด: ${up.name}`, v: `+${mb(up.d)} ล้านบาท (${pctTxt(chg(up.c, up.p))})`, e: `เทียบ ${spanP}`, l: ['#revenue', 'รายได้ตามกลุ่มลูกค้า'] });
       const md = moo.filter((o) => o.c - o.p < 0)[0];
-      if (md) ins.push({ t: `พื้นที่ที่รายได้ค่าน้ำลดมากที่สุด: ${md.name} −${baht(md.p - md.c)} บาท`, l: ['#usage', 'ดูการใช้น้ำเทียบปีก่อน'] });
-      if (A0 && A0.v) ins.push({ t: `รายได้เฉลี่ยต่อบัญชี ${int(A1.v)} บาท/เดือน (${pctTxt(chg(A1.v, A0.v))}) ขณะที่บัญชีที่ออกบิลเฉลี่ย ${int(A1.avg)} บัญชี/เดือน (${pctTxt(chg(A1.avg, A0.avg))})`, l: ['#customers', 'ดูลูกค้า'] });
+      if (md) ins.push({ dir: -1, t: `พื้นที่ที่รายได้ค่าน้ำลดมากที่สุด: ${md.name}`, v: `−${baht(md.p - md.c)} บาท (${pctTxt(chg(md.c, md.p))})`, e: 'ใบแจ้งหนี้ค่าน้ำ · หมู่ตามทะเบียนปัจจุบัน', l: ['#usage', 'การใช้น้ำเทียบปีก่อน'] });
+      if (A0 && A0.v) ins.push({ dir: A1.v >= A0.v ? 1 : -1, t: `รายได้เฉลี่ยต่อบัญชี ${int(A1.v)} บาท/เดือน`, v: pctTxt(chg(A1.v, A0.v)), e: `บัญชีที่ออกบิลเฉลี่ย ${int(A1.avg)} บัญชี/เดือน (${pctTxt(chg(A1.avg, A0.avg))}) — ต่อบัญชีลดแม้จำนวนบัญชีเพิ่ม`, l: ['#customers', 'ลูกค้า'] });
     }
     el.innerHTML = `
       ${srcLine(`ที่มา: WMS Snapshot ณ ${dLabel(S.asof)} · เทียบ ${esc(span)} กับ ${esc(spanP)} (ช่วงเดียวกันปีก่อน) · ไม่คำนวณ CLV · ไม่รวมกับรายได้ตามบัญชี TRCLOUD`)}
       <div class="grid g4">
-        ${kpi('รายได้รวม (ไม่รวม VAT)', mb(cur.net), 'ล้านบาท', 'ค่าน้ำ + ค่าบริการ + งานขาย − ส่วนลด − ใบลดหนี้ ตามใบแจ้งหนี้ WMS', [['ปีก่อน', prv ? `${mb(prv.net)} ล้าน` : 'ไม่มีฐานเทียบ'], prv ? ['เปลี่ยน', pctTxt(chg(cur.net, prv.net)), cur.net >= prv.net ? 'up' : 'down'] : null])}
-        ${kpi('รายได้ไม่รวม กปภ.', mb(eC), 'ล้านบาท', 'ตัดสัญญาขายส่ง กปภ. (T2.2) ที่สิ้นสุดแล้วออก เพื่อดูการเติบโตของลูกค้าที่ยังใช้น้ำอยู่', [['ปีก่อน', eP != null ? `${mb(eP)} ล้าน` : 'ไม่มีฐานเทียบ'], eP ? ['เปลี่ยน', pctTxt(chg(eC, eP)), eC >= eP ? 'up' : 'down'] : null])}
-        ${kpi('รายได้เฉลี่ยต่อบัญชี', A1.v == null ? '–' : int(A1.v), 'บาท/เดือน', 'ค่าน้ำ + ค่าบริการ − ส่วนลด (ไม่รวม VAT) ÷ จำนวนบัญชีที่ออกบิลรวมทุกเดือนในช่วง', [A0 && A0.v ? ['ปีก่อน', `${int(A0.v)} บาท`] : ['ปีก่อน', 'ไม่มีฐานเทียบ'], A0 && A0.v ? ['เปลี่ยน', pctTxt(chg(A1.v, A0.v)), A1.v >= A0.v ? 'up' : 'down'] : null])}
-        ${kpi('บัญชีที่ออกบิลเฉลี่ย', int(A1.avg), 'บัญชี/เดือน', 'จำนวนผู้ใช้น้ำที่มีใบแจ้งหนี้ค่าน้ำในแต่ละเดือน เฉลี่ยทั้งช่วง', [A0 ? ['ปีก่อน', `${int(A0.avg)} บัญชี`] : ['ปีก่อน', 'ไม่มีฐานเทียบ'], A0 ? ['เปลี่ยน', pctTxt(chg(A1.avg, A0.avg)), A1.avg >= A0.avg ? 'up' : 'down'] : null])}
+        ${kpi('รายได้รวม (ไม่รวม VAT)', mb(cur.net), 'ล้านบาท', 'ค่าน้ำ + ค่าบริการ + งานขาย − ส่วนลด − ใบลดหนี้ ตามใบแจ้งหนี้ WMS', [cmpRow('YoY', cur.net, prv && prv.net), ['ปีก่อน', prv ? `${mb(prv.net)} ล้าน` : 'ไม่มีฐานเทียบ', 'v-mute']], 'target')}
+        ${kpi('รายได้ไม่รวม กปภ.', mb(eC), 'ล้านบาท', 'ตัดสัญญาขายส่ง กปภ. (T2.2) ที่สิ้นสุดแล้วออก เพื่อดูการเติบโตของลูกค้าที่ยังใช้น้ำอยู่', [cmpRow('YoY', eC, eP), ['ปีก่อน', eP != null ? `${mb(eP)} ล้าน` : 'ไม่มีฐานเทียบ', 'v-mute']], 'accent')}
+        ${kpi('รายได้เฉลี่ยต่อบัญชี', A1.v == null ? '–' : int(A1.v), 'บาท/เดือน', 'ค่าน้ำ + ค่าบริการ − ส่วนลด (ไม่รวม VAT) ÷ จำนวนบัญชีที่ออกบิลรวมทุกเดือนในช่วง', [cmpRow('YoY', A1.v, A0 && A0.v), ['ปีก่อน', A0 && A0.v ? `${int(A0.v)} บาท` : 'ไม่มีฐานเทียบ', 'v-mute']])}
+        ${kpi('บัญชีที่ออกบิลเฉลี่ย', int(A1.avg), 'บัญชี/เดือน', 'จำนวนผู้ใช้น้ำที่มีใบแจ้งหนี้ค่าน้ำในแต่ละเดือน เฉลี่ยทั้งช่วง', [cmpRow('YoY', A1.avg, A0 && A0.avg), ['ปีก่อน', A0 ? `${int(A0.avg)} บัญชี` : 'ไม่มีฐานเทียบ', 'v-mute']])}
       </div>
-      ${ins.length ? `<div class="card ceo-ins"><h3>Insight การเติบโต</h3><ol>${ins.map((x) => `<li><b>${esc(x.t)}</b> <a href="${x.l[0]}">${esc(x.l[1])} →</a></li>`).join('')}</ol></div>` : ''}
+      ${ins.length ? `<div class="grid" style="margin-top:16px">${card('c-gr-ins', 'Insight การเติบโต', 'อ้างอิงตัวเลขในตารางด้านล่าง · กดลิงก์ทางขวาเพื่อดูรายละเอียด', '', `<ol class="acts">${ins.map((x, i) => `<li><span class="no">${i + 1}</span><div><div class="t1">${esc(x.t)} <span class="${x.dir > 0 ? 'pos' : 'neg'}">${x.dir > 0 ? '▲' : '▼'} ${esc(x.v)}</span></div><div class="im">${esc(x.e)}</div></div><div class="rt"><a href="${x.l[0]}">${esc(x.l[1])} →</a></div></li>`).join('')}</ol>`)}</div>` : ''}
       <div class="grid g2">
-        ${card('c-gr-svc', 'การเติบโตตามบริการ', 'ใบแจ้งหนี้ WMS ไม่รวม VAT · ค่าน้ำหักส่วนลดแล้ว', 'สาขา ประเภท', table(gcol('บริการ', (r) => esc(r.k)), svc, ['รวม', baht(cur.net), prv ? baht(prv.net) : '–', prv ? baht(cur.net - prv.net) : '–', prv ? cmp(cur.net, prv.net) : '–', '100%']), { csv: 1 })}
-        ${card('c-gr-br', 'การเติบโตตามพื้นที่ (สาขา/ตำบล)', 'ใบแจ้งหนี้ทุกประเภท ไม่รวม VAT', 'สาขา ประเภท', table(gcol('สาขา', (r) => esc(r.name)), byBr), { csv: 1 })}
-        ${card('c-gr-ty', 'การเติบโตตามกลุ่มลูกค้า', 'ใบแจ้งหนี้ทุกประเภท ไม่รวม VAT · กปภ. (T2.2) สัญญาสิ้นสุดแล้ว', 'สาขา ประเภท', table(gcol('กลุ่มลูกค้า', (r) => esc(r.name)), byTy), { csv: 1, w: 2 })}
-        ${card('c-gr-moo', 'หมู่ที่รายได้ค่าน้ำเปลี่ยนมากที่สุด', '12 อันดับตามขนาดการเปลี่ยนแปลง · ใบแจ้งหนี้ค่าน้ำเท่านั้น (ไม่รวมงานขาย) · หมู่ตามทะเบียนปัจจุบัน', 'สาขา ประเภท', table(gcol('หมู่ · สาขา', (r) => esc(r.name)).slice(0, 5), moo), { csv: 1 })}
-        ${card('c-gr-arpa', 'รายได้เฉลี่ยต่อบัญชี แยกกลุ่มลูกค้า', 'บาท/บัญชี/เดือน · ค่าน้ำ + ค่าบริการ − ส่วนลด (ไม่รวม VAT)', 'สาขา ประเภท', table([{ h: 'กลุ่มลูกค้า', f: (x) => esc(TY_NAME[x.t] || x.t) }, { h: 'บัญชีเฉลี่ย/เดือน', n: 1, f: (x) => nf1.format(x.a.avg), v: (x) => x.a.avg }, { h: 'รายได้เฉลี่ยต่อบัญชี', n: 1, f: (x) => baht(x.a.v), v: (x) => x.a.v }, { h: 'ปีก่อน', n: 1, f: (x) => (x.b && x.b.v ? baht(x.b.v) : '–'), v: (x) => (x.b && x.b.v) ?? '' }, { h: 'เปลี่ยน', n: 1, f: (x) => (x.b && x.b.v ? cmp(x.a.v, x.b.v) : '–') }], arTy), { csv: 1 })}
+        ${card('c-gr-svc', 'การเติบโตตามบริการ', 'ใบแจ้งหนี้ WMS ไม่รวม VAT · ค่าน้ำหักส่วนลดแล้ว', 'สาขา ประเภท', table(gcol('บริการ', (r) => esc(r.k), svc), svc, ['รวม', baht(cur.net), prv ? baht(prv.net) : '–', prv ? dBaht(cur.net, prv.net) : '–', prv ? cmp(cur.net, prv.net) : '–', '100%']), { csv: 1 })}
+        ${card('c-gr-br', 'การเติบโตตามพื้นที่ (สาขา/ตำบล)', 'ใบแจ้งหนี้ทุกประเภท ไม่รวม VAT', 'สาขา ประเภท', table(gcol('สาขา', (r) => `<b>${esc(r.name)}</b>`, byBr, (r) => brColor(r.k)), byBr), { csv: 1 })}
+        ${card('c-gr-ty', 'การเติบโตตามกลุ่มลูกค้า', 'ใบแจ้งหนี้ทุกประเภท ไม่รวม VAT · กปภ. (T2.2) สัญญาสิ้นสุดแล้ว', 'สาขา ประเภท', table(gcol('กลุ่มลูกค้า', (r) => esc(r.name), byTy), byTy), { csv: 1, w: 2 })}
+        ${card('c-gr-moo', 'หมู่ที่รายได้ค่าน้ำเปลี่ยนมากที่สุด', '12 อันดับตามขนาดการเปลี่ยนแปลง · ใบแจ้งหนี้ค่าน้ำเท่านั้น (ไม่รวมงานขาย) · หมู่ตามทะเบียนปัจจุบัน', 'สาขา ประเภท', table(gcol('หมู่ · สาขา', (r) => esc(r.name), moo).slice(0, 5), moo), { csv: 1 })}
+        ${card('c-gr-arpa', 'รายได้เฉลี่ยต่อบัญชี แยกกลุ่มลูกค้า', 'บาท/บัญชี/เดือน · ค่าน้ำ + ค่าบริการ − ส่วนลด (ไม่รวม VAT)', 'สาขา ประเภท', table([{ h: 'กลุ่มลูกค้า', f: (x) => esc(TY_NAME[x.t] || x.t) }, { h: 'บัญชีเฉลี่ย/เดือน', n: 1, f: (x) => nf1.format(x.a.avg), v: (x) => x.a.avg }, { h: 'รายได้เฉลี่ยต่อบัญชี', n: 1, f: (x) => barCell(baht(x.a.v), x.a.v, Math.max(...arTy.map((y) => y.a.v || 0)), 'var(--accent)'), v: (x) => x.a.v }, { h: 'ปีก่อน', n: 1, f: (x) => (x.b && x.b.v ? `<span class="muted">${baht(x.b.v)}</span>` : '–'), v: (x) => (x.b && x.b.v) ?? '' }, { h: 'เปลี่ยน', n: 1, f: (x) => (x.b && x.b.v ? cmp(x.a.v, x.b.v) : '–') }], arTy), { csv: 1 })}
       </div>`;
   }
 
